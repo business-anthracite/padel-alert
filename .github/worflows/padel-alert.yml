@@ -1,0 +1,51 @@
+name: Vérification tournois padel
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-tournois:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Installation de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installation des dépendances
+        run: pip install playwright beautifulsoup4 requests
+
+      - name: Installation de Playwright (Chromium)
+        run: playwright install chromium --with-deps
+
+      - name: Vérification des tournois
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python check_tournois.py
+
+      - name: Upload des fichiers de debug
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-files
+          path: |
+            debug_page.html
+            debug_ajax_response.json
+          retention-days: 1
+
+      - name: Sauvegarde des tournois connus
+        run: |
+          git config user.name "padel-alert-bot"
+          git config user.email "actions@github.com"
+          git add known_tournaments.json
+          git diff --staged --quiet || git commit -m "Mise à jour tournois connus [$(date '+%Y-%m-%d %H:%M')]"
+          git push
