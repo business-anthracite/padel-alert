@@ -1,3 +1,4 @@
+import os
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
@@ -6,10 +7,28 @@ from config import DATABASE_URL
 
 _pool: ThreadedConnectionPool | None = None
 
+_SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
+
+
+def _init_schema(conn):
+    """Run schema.sql if the users table does not exist yet."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regclass('public.users')")
+        if cur.fetchone()[0] is None:
+            with open(_SCHEMA_PATH) as f:
+                cur.execute(f.read())
+            conn.commit()
+
 
 def init_pool():
     global _pool
     _pool = ThreadedConnectionPool(minconn=1, maxconn=5, dsn=DATABASE_URL)
+    # Auto-migrate on first boot
+    conn = _pool.getconn()
+    try:
+        _init_schema(conn)
+    finally:
+        _pool.putconn(conn)
 
 
 def close_pool():
