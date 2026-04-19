@@ -1,4 +1,8 @@
 import os
+import random
+import string
+import hashlib
+from datetime import datetime, timezone, timedelta
 import psycopg2
 import psycopg2.extras
 from psycopg2.pool import ThreadedConnectionPool
@@ -10,14 +14,40 @@ _pool: ThreadedConnectionPool | None = None
 _SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 
+_MIGRATIONS = [
+    # 001 — birth_date rendu nullable (non collecté au checkout)
+    "ALTER TABLE users ALTER COLUMN birth_date DROP NOT NULL",
+]
+
+
 def _init_schema(conn):
-    """Run schema.sql if the users table does not exist yet."""
+    """Run schema.sql if the users table does not exist yet, then apply migrations."""
     with conn.cursor() as cur:
         cur.execute("SELECT to_regclass('public.users')")
         if cur.fetchone()[0] is None:
             with open(_SCHEMA_PATH) as f:
                 cur.execute(f.read())
             conn.commit()
+
+        # Migrations table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS _migrations (
+                id SERIAL PRIMARY KEY,
+                applied_at TIMESTAMPTZ DEFAULT NOW(),
+                sql TEXT UNIQUE
+            )
+        """)
+        conn.commit()
+
+        for sql in _MIGRATIONS:
+            cur.execute("SELECT 1 FROM _migrations WHERE sql = %s", (sql,))
+            if not cur.fetchone():
+                try:
+                    cur.execute(sql)
+                    cur.execute("INSERT INTO _migrations (sql) VALUES (%s)", (sql,))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
 
 
 def init_pool():
@@ -99,6 +129,89 @@ def save_known_tournaments(alert_id: str, tournaments: list[dict]):
                 """,
                 [(alert_id, t["id"], t["nom"]) for t in tournaments],
             )
+
+
+# ── Intégration WooCommerce ────────────────────────────────────────────────────
+
+def _gen_referral_code(first_name: str) -> str:
+    suffix = "".join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    base = (first_name[:4].upper() if first_name else "USER")
+    return f"{base}{suffix}"
+
+
+def upsert_user_subscription(
+    email: str,
+    first_name: str,
+    last_name: str,
+    plan: str,
+    billing_period: str,
+    stripe_subscription_id: str | None = None,
+    wc_subscription_id: int | None = None,
+) -> dict:
+    """
+    Crée ou met à jour l'utilisateur et son abonnement suite à un paiement WooCommerce.
+    Retourne {"user_id": ..., "subscription_id": ..., "created": bool}.
+    """
+    now = datetime.now(timezone.utc)
+    trial_ends = now + timedelta(days=14)
+
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+
+            # ── Utilisateur ──────────────────────────────────────────────
+            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+            row = cur.fetchone()
+            created = row is None
+
+            if created:
+                placeholder_hash = hashlib.sha256(
+                    (email + str(now.timestamp())).encode()
+                ).hexdigest()
+                referral_code = _gen_referral_code(first_name)
+                # Ensure uniqueness
+                cur.execute("SELECT 1 FROM users WHERE referral_code = %s", (referral_code,))
+                while cur.fetchone():
+                    referral_code = _gen_referral_code(first_name)
+                    cur.execute("SELECT 1 FROM users WHERE referral_code = %s", (referral_code,))
+
+                cur.execute("""
+                    INSERT INTO users (email, first_name, last_name, password_hash, referral_code)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (email, first_name, last_name, placeholder_hash, referral_code))
+                user_id = str(cur.fetchone()["id"])
+            else:
+                user_id = str(row["id"])
+                cur.execute("""
+                    UPDATE users SET first_name = %s, last_name = %s WHERE id = %s
+                """, (first_name, last_name, user_id))
+
+            # ── Abonnement ───────────────────────────────────────────────
+            cur.execute("""
+                SELECT id FROM subscriptions
+                WHERE user_id = %s AND status NOT IN ('cancelled', 'expired')
+                ORDER BY created_at DESC LIMIT 1
+            """, (user_id,))
+            existing_sub = cur.fetchone()
+
+            if existing_sub:
+                sub_id = str(existing_sub["id"])
+                cur.execute("""
+                    UPDATE subscriptions
+                    SET plan_type = %s, billing_period = %s, status = 'trial',
+                        trial_ends_at = %s, stripe_subscription_id = %s
+                    WHERE id = %s
+                """, (plan, billing_period, trial_ends, stripe_subscription_id, sub_id))
+            else:
+                cur.execute("""
+                    INSERT INTO subscriptions
+                        (user_id, plan_type, billing_period, status, trial_ends_at, stripe_subscription_id)
+                    VALUES (%s, %s, %s, 'trial', %s, %s)
+                    RETURNING id
+                """, (user_id, plan, billing_period, trial_ends, stripe_subscription_id))
+                sub_id = str(cur.fetchone()["id"])
+
+    return {"user_id": user_id, "subscription_id": sub_id, "created": created}
 
 
 def log_notification(user_id: str, alert_id: str, tournaments: list[dict]):

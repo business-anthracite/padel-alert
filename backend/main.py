@@ -1,11 +1,16 @@
 """
 Padel Alert — Backend multi-utilisateurs
-Tourne en continu sur Railway, exécute la vérification toutes les heures.
+- Thread 1 : serveur HTTP FastAPI (webhooks WooCommerce)
+- Thread 2 : scheduler scraping Ten'Up toutes les heures
 """
+import os
 import time
+import threading
 import schedule
 import logging
 from datetime import datetime
+
+import uvicorn
 
 from config import CHECK_INTERVAL_MINUTES
 from database import init_pool, close_pool, fetch_active_alerts, fetch_known_tournament_ids, save_known_tournaments, log_notification
@@ -31,7 +36,6 @@ def run_check():
 
     log.info(f"{len(alerts)} alerte(s) active(s) à traiter.")
 
-    # Une seule session Playwright pour tout le cycle
     try:
         log.info("Ouverture de la session Ten'Up...")
         form_build_id, cookies = get_session()
@@ -56,8 +60,8 @@ def run_check():
             log.error(f"    ✗ Erreur scraping : {e}")
             continue
 
-        known_ids   = fetch_known_tournament_ids(alert_id)
-        new_ones    = [t for t in tournaments if t["id"] not in known_ids]
+        known_ids = fetch_known_tournament_ids(alert_id)
+        new_ones  = [t for t in tournaments if t["id"] not in known_ids]
 
         if new_ones:
             log.info(f"    → {len(new_ones)} NOUVEAU(X) ! Envoi email à {alert['email']}")
@@ -77,30 +81,32 @@ def run_check():
                 log.error(f"    ✗ Erreur envoi email : {e}")
         else:
             log.info(f"    → Aucun nouveau tournoi.")
-            # Mise à jour de la liste des connus même sans nouveaux (évite les re-détections)
             save_known_tournaments(alert_id, tournaments)
 
     elapsed = (datetime.now() - start).total_seconds()
     log.info(f"═══ Fin — {total_new} nouveau(x) tournoi(s), {total_sent} email(s) envoyé(s) en {elapsed:.1f}s ═══")
 
 
+def _run_scheduler():
+    run_check()
+    schedule.every(CHECK_INTERVAL_MINUTES).minutes.do(run_check)
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
+
+
 def main():
     log.info("Padel Alert backend démarré.")
     init_pool()
 
-    # Premier passage immédiat au démarrage
-    run_check()
+    # Scheduler dans un thread daemon
+    t = threading.Thread(target=_run_scheduler, daemon=True)
+    t.start()
 
-    schedule.every(CHECK_INTERVAL_MINUTES).minutes.do(run_check)
-
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(30)
-    except KeyboardInterrupt:
-        log.info("Arrêt demandé.")
-    finally:
-        close_pool()
+    # Serveur HTTP dans le thread principal (Railway attend un process long-running)
+    port = int(os.environ.get("PORT", 8000))
+    log.info(f"Démarrage API HTTP sur le port {port}")
+    uvicorn.run("api:app", host="0.0.0.0", port=port, log_level="info")
 
 
 if __name__ == "__main__":

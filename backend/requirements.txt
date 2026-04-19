@@ -3,3 +3,5 @@ beautifulsoup4==4.12.3
 requests==2.32.3
 psycopg2-binary==2.9.9
 schedule==1.2.2
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
