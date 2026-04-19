@@ -41,18 +41,18 @@ TOURNAMENT_CATEGORIES = {
     "P2000": "P2000",
 }
 
-# Limites d'alertes par plan
+# Limites d'alertes par plan (None = illimité)
 PLAN_ALERT_LIMITS = {
-    "essential": 2,
-    "pro": None,  # illimité
+    "standard": 1,
+    "premium":  None,
 }
 
-# Tarifs en centimes (pour PayPlug)
+# Tarifs en centimes
 PLAN_PRICES = {
-    "essential_monthly": 399,
-    "essential_annual":  3499,
-    "pro_monthly":       599,
-    "pro_annual":        4999,
+    "standard_monthly": 399,
+    "standard_annual":  3499,
+    "premium_monthly":  599,
+    "premium_annual":   4999,
 }
 
 # Réduction parrainage en centimes

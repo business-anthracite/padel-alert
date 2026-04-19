@@ -214,6 +214,89 @@ def upsert_user_subscription(
     return {"user_id": user_id, "subscription_id": sub_id, "created": created}
 
 
+# ── Gestion des alertes (API) ──────────────────────────────────────────────────
+
+def get_user_with_subscription(email: str) -> dict | None:
+    """Retourne l'utilisateur + son abonnement actif, ou None."""
+    sql = """
+        SELECT u.id, u.email, u.first_name, u.last_name,
+               s.id AS sub_id, s.plan_type, s.billing_period, s.status
+        FROM users u
+        LEFT JOIN subscriptions s ON s.user_id = u.id
+            AND s.status IN ('trial', 'active')
+        WHERE u.email = %s
+        ORDER BY s.created_at DESC
+        LIMIT 1
+    """
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql, (email,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+
+def get_user_alerts(user_id: str) -> list[dict]:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT id, name, location_value, location_label,
+                       lat, lng, radius_km, match_types, age_categories,
+                       competition_types, tournament_categories, is_active, created_at
+                FROM alerts
+                WHERE user_id = %s
+                ORDER BY created_at ASC
+            """, (user_id,))
+            return [dict(r) for r in cur.fetchall()]
+
+
+def create_alert(user_id: str, data: dict) -> dict:
+    import json as _json
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                INSERT INTO alerts
+                    (user_id, name, location_type, location_value, location_label,
+                     lat, lng, radius_km, match_types, age_categories,
+                     competition_types, tournament_categories)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING id
+            """, (
+                user_id,
+                data.get("name") or None,
+                data.get("location_type", "ville"),
+                data["location_value"],
+                data["location_label"],
+                data.get("lat"),
+                data.get("lng"),
+                data.get("radius_km", 80),
+                _json.dumps(data.get("match_types", ["DM"])),
+                _json.dumps(data.get("age_categories", ["200"])),
+                _json.dumps(data.get("competition_types", ["P"])),
+                _json.dumps(data.get("tournament_categories", ["P50", "P100"])),
+            ))
+            return dict(cur.fetchone())
+
+
+def delete_alert(alert_id: str, user_id: str) -> bool:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM alerts WHERE id = %s AND user_id = %s",
+                (alert_id, user_id)
+            )
+            return cur.rowcount > 0
+
+
+def toggle_alert(alert_id: str, user_id: str, is_active: bool) -> bool:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE alerts SET is_active = %s WHERE id = %s AND user_id = %s",
+                (is_active, alert_id, user_id)
+            )
+            return cur.rowcount > 0
+
+
 def log_notification(user_id: str, alert_id: str, tournaments: list[dict]):
     sql = """
         INSERT INTO notifications_log (user_id, alert_id, tournament_ids, tournament_count)
