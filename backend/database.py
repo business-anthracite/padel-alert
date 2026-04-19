@@ -1,0 +1,97 @@
+import psycopg2
+import psycopg2.extras
+from psycopg2.pool import ThreadedConnectionPool
+from contextlib import contextmanager
+from config import DATABASE_URL
+
+_pool: ThreadedConnectionPool | None = None
+
+
+def init_pool():
+    global _pool
+    _pool = ThreadedConnectionPool(minconn=1, maxconn=5, dsn=DATABASE_URL)
+
+
+def close_pool():
+    if _pool:
+        _pool.closeall()
+
+
+@contextmanager
+def get_conn():
+    conn = _pool.getconn()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        _pool.putconn(conn)
+
+
+# ── Alertes ────────────────────────────────────────────────────────────────────
+
+def fetch_active_alerts() -> list[dict]:
+    """Retourne toutes les alertes actives dont l'abonnement est valide."""
+    sql = """
+        SELECT
+            a.id, a.user_id, a.name,
+            a.location_type, a.location_value, a.location_label,
+            a.lat, a.lng, a.radius_km,
+            a.match_types, a.age_categories,
+            a.competition_types, a.tournament_categories,
+            u.email, u.first_name
+        FROM alerts a
+        JOIN users u ON u.id = a.user_id
+        JOIN subscriptions s ON s.user_id = a.user_id
+        WHERE a.is_active = TRUE
+          AND s.status IN ('trial', 'active')
+          AND (s.trial_ends_at IS NULL OR s.trial_ends_at > NOW())
+          AND (s.current_period_end IS NULL OR s.current_period_end > NOW())
+    """
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(sql)
+            return [dict(r) for r in cur.fetchall()]
+
+
+def fetch_known_tournament_ids(alert_id: str) -> set[str]:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT tournament_id FROM known_tournaments WHERE alert_id = %s",
+                (alert_id,)
+            )
+            return {row[0] for row in cur.fetchall()}
+
+
+def save_known_tournaments(alert_id: str, tournaments: list[dict]):
+    """Marque les tournois comme connus pour cette alerte."""
+    if not tournaments:
+        return
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(
+                cur,
+                """
+                INSERT INTO known_tournaments (alert_id, tournament_id, tournament_name)
+                VALUES %s ON CONFLICT DO NOTHING
+                """,
+                [(alert_id, t["id"], t["nom"]) for t in tournaments],
+            )
+
+
+def log_notification(user_id: str, alert_id: str, tournaments: list[dict]):
+    sql = """
+        INSERT INTO notifications_log (user_id, alert_id, tournament_ids, tournament_count)
+        VALUES (%s, %s, %s, %s)
+    """
+    import json
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (
+                user_id, alert_id,
+                json.dumps([t["id"] for t in tournaments]),
+                len(tournaments),
+            ))
