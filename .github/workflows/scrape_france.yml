@@ -1,0 +1,28 @@
+name: "Padel Alert — Scraping France"
+
+on:
+  schedule:
+    - cron: "5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dependances
+        run: |
+          pip install -r backend/requirements_france.txt
+          playwright install chromium --with-deps
+
+      - name: Scraper TenUp et envoyer a WordPress
+        env:
+          WP_INGEST_URL: ${{ secrets.WP_INGEST_URL }}
+          WP_INGEST_SECRET: ${{ secrets.WP_INGEST_SECRET }}
+        run: python backend/scraper_france.py
