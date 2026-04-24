@@ -1,63 +1,50 @@
 """
-Padel Alert — Scraper France entière
-Scrape toutes les ligues françaises sur Ten'Up, écrit les résultats dans
-data/tournaments.json (commit GitHub). WordPress pull ce fichier via WP-Cron.
-Tourne sur GitHub Actions toutes les heures.
+Padel Alert — Scraper France entière (v2)
+Recherche ligue=ALL via Playwright (interception requête AJAX réelle).
+Écrit data/tournaments.json + commit GitHub.
+WordPress pull ce fichier via WP-Cron.
 """
 import os
 import math
 import json
 import subprocess
 import requests
+import urllib.parse
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
-OUTPUT_FILE = "data/tournaments.json"
-
+OUTPUT_FILE  = "data/tournaments.json"
 TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
-HORIZON_DAYS = 180
+HORIZON_DAYS = 90   # 3 mois à venir
 
 JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]
 
-# ── 13 ligues françaises — une ville centrale par ligue ───────────────────────
-LIGUES_FRANCE = [
-    {"region":"Pays de la Loire",            "ville_value":"Nantes, 44000",      "ville_label":"Nantes, 44, Loire-Atlantique, Pays de la Loire",                          "lat":"47.218371","lng":"-1.553621","distance":"200"},
-    {"region":"Bretagne",                    "ville_value":"Rennes, 35000",      "ville_label":"Rennes, 35, Ille-et-Vilaine, Bretagne",                                   "lat":"48.117266","lng":"-1.677793","distance":"200"},
-    {"region":"Normandie",                   "ville_value":"Rouen, 76000",       "ville_label":"Rouen, 76, Seine-Maritime, Normandie",                                    "lat":"49.443232","lng":"1.099971", "distance":"200"},
-    {"region":"Hauts-de-France",             "ville_value":"Lille, 59000",       "ville_label":"Lille, 59, Nord, Hauts-de-France",                                        "lat":"50.629250","lng":"3.057256", "distance":"200"},
-    {"region":"Grand Est",                   "ville_value":"Strasbourg, 67000",  "ville_label":"Strasbourg, 67, Bas-Rhin, Grand Est",                                     "lat":"48.573405","lng":"7.752111", "distance":"200"},
-    {"region":"Île-de-France",               "ville_value":"Paris, 75001",       "ville_label":"Paris, 75, Paris, Île-de-France",                                         "lat":"48.859489","lng":"2.347880", "distance":"200"},
-    {"region":"Centre-Val de Loire",         "ville_value":"Orléans, 45000",     "ville_label":"Orléans, 45, Loiret, Centre-Val de Loire",                                "lat":"47.902964","lng":"1.909251", "distance":"200"},
-    {"region":"Bourgogne-Franche-Comté",     "ville_value":"Dijon, 21000",       "ville_label":"Dijon, 21, Côte-d'Or, Bourgogne-Franche-Comté",                          "lat":"47.322047","lng":"5.041480", "distance":"200"},
-    {"region":"Auvergne-Rhône-Alpes",        "ville_value":"Lyon, 69001",        "ville_label":"Lyon 1er Arrondissement, 69, Rhône, Auvergne-Rhône-Alpes",               "lat":"45.748834","lng":"4.846788", "distance":"200"},
-    {"region":"Provence-Alpes-Côte d'Azur",  "ville_value":"Marseille, 13001",   "ville_label":"Marseille 1er Arrondissement, 13, Bouches-du-Rhône, Provence-Alpes-Côte d'Azur", "lat":"43.296482","lng":"5.381824","distance":"200"},
-    {"region":"Occitanie",                   "ville_value":"Toulouse, 31000",    "ville_label":"Toulouse, 31, Haute-Garonne, Occitanie",                                  "lat":"43.604652","lng":"1.444209", "distance":"200"},
-    {"region":"Nouvelle-Aquitaine",          "ville_value":"Bordeaux, 33000",    "ville_label":"Bordeaux, 33, Gironde, Nouvelle-Aquitaine",                               "lat":"44.837789","lng":"-0.579180","distance":"200"},
-    {"region":"Corse",                       "ville_value":"Ajaccio, 20000",     "ville_label":"Ajaccio, 20, Corse-du-Sud, Corse",                                        "lat":"41.919775","lng":"8.738635", "distance":"200"},
-]
 
-# Tous les critères — on veut TOUS les tournois, sans filtre
-ALL_CRITERIA = {
-    "epreuve[DM]":"DM","epreuve[DD]":"DD","epreuve[DX]":"DX",
-    "categorie_age[910]":"910","categorie_age[1112]":"1112","categorie_age[1314]":"1314",
-    "categorie_age[1516]":"1516","categorie_age[1718]":"1718","categorie_age[200]":"200",
-    "categorie_age[345]":"345","categorie_age[355]":"355",
-    "type[P]":"P","type[CE]":"CE","type[CEQ]":"CEQ",
-    "categorie_tournoi[P25]":"P25","categorie_tournoi[P50]":"P50",
-    "categorie_tournoi[P100]":"P100","categorie_tournoi[P250]":"P250",
-    "categorie_tournoi[P500]":"P500","categorie_tournoi[P1000]":"P1000",
-    "categorie_tournoi[P1500]":"P1500","categorie_tournoi[P2000]":"P2000",
-}
+# ── Session + interception paramètres AJAX réels ──────────────────────────────
 
+def get_session_and_params(date_start, date_end):
+    """
+    Ouvre Ten'Up via Playwright, soumet la recherche ligue=ALL,
+    intercepte la vraie requête AJAX pour capturer les paramètres exacts.
+    Retourne: (cookies_dict, base_params, first_items, nb_total)
+    """
+    captured_bodies  = []
+    captured_results = []
 
-# ── Session Ten'Up (Playwright requis pour passer le challenge JS) ─────────────
+    def on_request(req):
+        if TENUP_AJAX in req.url and req.method == "POST":
+            captured_bodies.append(req.post_data or "")
 
-def get_session():
-    """Ouvre Ten'Up avec Playwright, récupère form_build_id + cookies."""
-    print("Ouverture session Ten'Up via Playwright...")
+    def on_response(resp):
+        if TENUP_AJAX in resp.url and resp.status == 200:
+            try:
+                captured_results.append(resp.json())
+            except Exception:
+                pass
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(
@@ -65,15 +52,78 @@ def get_session():
             locale="fr-FR",
         )
         page = ctx.new_page()
+        page.on("request",  on_request)
+        page.on("response", on_response)
+
+        print("Ouverture Ten'Up via Playwright...")
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(6000)
-        form_build_id = page.evaluate("() => { const el=document.querySelector('input[name=\"form_build_id\"]'); return el?el.value:null; }")
+        page.wait_for_timeout(5000)
+
+        # Basculer en mode "par ligue" si le formulaire le permet
+        ligue_radio = page.query_selector("input[value='ligue'][name='recherche_type']")
+        if ligue_radio:
+            ligue_radio.click()
+            page.wait_for_timeout(1500)
+            print("Mode 'par ligue' sélectionné")
+        else:
+            print("Pas de radio 'ligue' — formulaire en mode par défaut")
+
+        # Injecter les dates directement dans le DOM
+        page.evaluate(f"""() => {{
+            const s = document.querySelector('[name="date[start]"]');
+            const e = document.querySelector('[name="date[end]"]');
+            if (s) {{ s.value = '{date_start}'; s.dispatchEvent(new Event('change')); }}
+            if (e) {{ e.value = '{date_end}'; e.dispatchEvent(new Event('change')); }}
+        }}""")
+        page.wait_for_timeout(500)
+
+        # S'assurer que PADEL est sélectionné
+        pratique = page.query_selector("input[name='pratique'][value='PADEL'], select[name='pratique']")
+        if pratique:
+            tag = pratique.evaluate("el => el.tagName")
+            if tag == "SELECT":
+                page.select_option("select[name='pratique']", "PADEL")
+            else:
+                if not pratique.is_checked():
+                    pratique.click()
+
+        # Soumettre le formulaire
+        page.click("input[name='submit_main']")
+        page.wait_for_timeout(8000)
+
         cookies = ctx.cookies()
         browser.close()
-    if not form_build_id:
-        raise RuntimeError("form_build_id introuvable — Ten'Up a peut-être changé sa structure")
-    print(f"Session OK — form_build_id: {form_build_id[:30]}...")
-    return form_build_id, {c["name"]: c["value"] for c in cookies}
+
+    cookies_dict = {c["name"]: c["value"] for c in cookies}
+
+    # Extraire base_params depuis la requête interceptée
+    base_params = {}
+    for body in reversed(captured_bodies):
+        parsed = urllib.parse.parse_qs(body, keep_blank_values=True)
+        if "form_id" in parsed:
+            for k, v in parsed.items():
+                if k not in ("form_build_id", "page"):
+                    base_params[k] = v[0] if len(v) == 1 else v
+            break
+
+    if not base_params:
+        raise RuntimeError("Aucun paramètre AJAX intercepté — formulaire non soumis")
+
+    # Extraire les premiers résultats
+    first_items = []
+    nb_total    = 0
+    for result_data in reversed(captured_results):
+        for cmd in result_data:
+            if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
+                res       = cmd.get("results", {})
+                first_items = res.get("items", [])
+                nb_total  = res.get("nb_results", 0)
+                break
+        if nb_total > 0 or first_items:
+            break
+
+    print(f"Session OK — {nb_total} tournois détectés sur la période")
+    return cookies_dict, base_params, first_items, nb_total
 
 
 def make_session(cookies_dict):
@@ -95,7 +145,7 @@ def make_session(cookies_dict):
 def refresh_fbid(session):
     resp = session.get(TENUP_SEARCH, timeout=30)
     soup = BeautifulSoup(resp.text, "html.parser")
-    el = soup.find("input", {"name": "form_build_id"})
+    el   = soup.find("input", {"name": "form_build_id"})
     if el:
         return el["value"]
     import re
@@ -105,75 +155,47 @@ def refresh_fbid(session):
     raise RuntimeError("Impossible de rafraîchir form_build_id")
 
 
-# ── Scraping d'une ligue ───────────────────────────────────────────────────────
+# ── Pagination ────────────────────────────────────────────────────────────────
 
-def scrape_ligue(session, ligue):
-    """Scrape tous les tournois padel d'une région. Retourne liste de tournois bruts."""
-    region = ligue["region"]
-    print(f"  Scraping {region}...")
+def fetch_all_pages(session, base_params, first_items, nb_total):
+    """Pagine tous les résultats et retourne tous les items."""
+    all_items = {str(item.get("id")): item for item in first_items}
+    nb_pages  = math.ceil(nb_total / 30) if nb_total > 0 else 1
+    print(f"Pagination : {nb_pages} page(s) à récupérer...")
 
-    date_start = datetime.now().strftime("%d/%m/%y")
-    date_end   = (datetime.now() + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
+    start_time = datetime.now()
+    for page_num in range(1, nb_pages):
+        elapsed = (datetime.now() - start_time).total_seconds()
+        if elapsed > 1200:  # 20 min max de pagination
+            print(f"⚠️  Limite de temps atteinte à la page {page_num}/{nb_pages}")
+            break
 
-    base_params = {
-        "recherche_type": "ville",
-        "ville[autocomplete][country]": "fr",
-        "ville[autocomplete][textfield]": "",
-        "ville[autocomplete][value_container][value_field]": ligue["ville_value"],
-        "ville[autocomplete][value_container][label_field]": ligue["ville_label"],
-        "ville[autocomplete][value_container][lat_field]":   ligue["lat"],
-        "ville[autocomplete][value_container][lng_field]":   ligue["lng"],
-        "ville[distance][value_field]": ligue["distance"],
-        "club[autocomplete][textfield]": "",
-        "club[autocomplete][value_container][value_field]": "",
-        "club[autocomplete][value_container][label_field]": "",
-        "pratique": "PADEL",
-        "date[start]": date_start,
-        "date[end]":   date_end,
-        **ALL_CRITERIA,
-        "sort": "_DIST_",
-        "form_id": "recherche_tournois_form",
-        "_triggering_element_name":  "submit_main",
-        "_triggering_element_value": "Rechercher",
-    }
-
-    all_items = []
-    seen_ids  = set()
-    page      = 0
-    nb_pages  = 1
-
-    while page < nb_pages:
         fbid = refresh_fbid(session)
-        data = {**base_params, "form_build_id": fbid, "page": str(page)}
+        data = {**base_params, "form_build_id": fbid, "page": str(page_num)}
         try:
             resp = session.post(TENUP_AJAX, data=data, timeout=30)
             resp.raise_for_status()
             for cmd in resp.json():
                 if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                    results  = cmd.get("results", {})
-                    items    = results.get("items", [])
-                    nb_total = results.get("nb_results", 0)
-                    nb_pages = math.ceil(nb_total / 30) if nb_total > 0 else 1
-                    new_items = [it for it in items if it.get("id") not in seen_ids]
-                    if page > 0 and not new_items:
-                        nb_pages = 0
-                        break
-                    for it in new_items:
-                        seen_ids.add(it.get("id"))
-                    all_items.extend(new_items)
+                    items = cmd.get("results", {}).get("items", [])
+                    if not items:
+                        print(f"  Page {page_num} vide — arrêt")
+                        return list(all_items.values())
+                    for item in items:
+                        all_items[str(item.get("id"))] = item
                     break
         except Exception as e:
-            print(f"    Erreur page {page}: {e}")
-            break
-        page += 1
+            print(f"  Erreur page {page_num}: {e}")
 
-    print(f"    → {len(all_items)} tournoi(s)")
-    return all_items, region
+        if page_num % 20 == 0:
+            print(f"  Page {page_num}/{nb_pages} — {len(all_items)} tournois ({elapsed:.0f}s)")
+
+    return list(all_items.values())
 
 
-# ── Parsing des items ──────────────────────────────────────────────────────────
+# ── Parsing ───────────────────────────────────────────────────────────────────
 
-def parse_item(item, region):
+def parse_item(item):
     tid = str(item.get("id", ""))
     if not tid:
         return None
@@ -185,11 +207,10 @@ def parse_item(item, region):
     lat     = installation.get("lat")
     lng     = installation.get("lng")
 
-    # Dates
     date_debut_raw = item.get("dateDebut")
-    date_debut     = date_debut_raw.get("date","") if isinstance(date_debut_raw, dict) else ""
+    date_debut     = date_debut_raw.get("date", "") if isinstance(date_debut_raw, dict) else ""
     date_fin_raw   = item.get("dateFin")
-    date_fin       = date_fin_raw.get("date","")   if isinstance(date_fin_raw,  dict) else ""
+    date_fin       = date_fin_raw.get("date", "")   if isinstance(date_fin_raw,  dict) else ""
 
     if date_debut:
         try:
@@ -203,23 +224,22 @@ def parse_item(item, region):
     else:
         date_str = "Date inconnue"
 
-    # Critères depuis les épreuves
-    epreuves_raw       = item.get("epreuves", [])
-    match_types        = list({e.get("typeEpreuve",        {}).get("code","") for e in epreuves_raw if e.get("typeEpreuve",        {}).get("code")})
-    age_codes          = list({e.get("categoriePratiquant",{}).get("code","") for e in epreuves_raw if e.get("categoriePratiquant",{}).get("code")})
-    niveau_codes       = list({e.get("categorieEpreuve",   {}).get("code","") for e in epreuves_raw if e.get("categorieEpreuve",   {}).get("code")})
-    competition_codes  = list({e.get("typeCompetition",    {}).get("code","") for e in epreuves_raw if e.get("typeCompetition",    {}).get("code")})
+    epreuves_raw      = item.get("epreuves", [])
+    match_types       = list({e.get("typeEpreuve",        {}).get("code", "") for e in epreuves_raw if e.get("typeEpreuve",        {}).get("code")})
+    age_codes         = list({e.get("categoriePratiquant",{}).get("code", "") for e in epreuves_raw if e.get("categoriePratiquant",{}).get("code")})
+    niveau_codes      = list({e.get("categorieEpreuve",   {}).get("code", "") for e in epreuves_raw if e.get("categorieEpreuve",   {}).get("code")})
+    competition_codes = list({e.get("typeCompetition",    {}).get("code", "") for e in epreuves_raw if e.get("typeCompetition",    {}).get("code")})
 
     try:
-        lat_f = float(lat) if lat not in (None,"","0",0,0.0) else None
-        lng_f = float(lng) if lng not in (None,"","0",0,0.0) else None
+        lat_f = float(lat) if lat not in (None, "", "0", 0, 0.0) else None
+        lng_f = float(lng) if lng not in (None, "", "0", 0, 0.0) else None
     except (ValueError, TypeError):
         lat_f = lng_f = None
 
     return {
         "tenup_id":         tid,
-        "libelle":          item.get("libelle","Tournoi"),
-        "club":             item.get("nomClub",""),
+        "libelle":          item.get("libelle", "Tournoi"),
+        "club":             item.get("nomClub", ""),
         "ville":            ville,
         "cp":               cp,
         "adresse":          f"{adresse}, {cp} {ville}".strip(", "),
@@ -232,43 +252,33 @@ def parse_item(item, region):
         "age_codes":        age_codes,
         "niveau_codes":     niveau_codes,
         "competition_codes":competition_codes,
-        "ligues":           [region],
+        "ligues":           [],
         "link":             f"{TENUP_BASE}/tournoi/{tid}",
     }
 
 
-# ── Main ───────────────────────────────────────────────────────────────────────
+# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraping France entière")
+    now        = datetime.now()
+    date_start = now.strftime("%d/%m/%y")
+    date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
 
-    form_build_id, cookies = get_session()
-    session = make_session(cookies)
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraping France (ligue=ALL, {date_start} → {date_end})")
 
-    all_tournaments = {}  # tenup_id → tournament dict
+    cookies_dict, base_params, first_items, nb_total = get_session_and_params(date_start, date_end)
+    session = make_session(cookies_dict)
 
-    for ligue in LIGUES_FRANCE:
-        raw_items, region = scrape_ligue(session, ligue)
-        for item in raw_items:
-            parsed = parse_item(item, region)
-            if not parsed:
-                continue
-            tid = parsed["tenup_id"]
-            if tid in all_tournaments:
-                # Tournoi déjà vu dans une autre ligue — ajouter la région
-                if region not in all_tournaments[tid]["ligues"]:
-                    all_tournaments[tid]["ligues"].append(region)
-            else:
-                all_tournaments[tid] = parsed
+    raw_items = fetch_all_pages(session, base_params, first_items, nb_total)
 
-    tournaments = list(all_tournaments.values())
-    print(f"\nTotal France : {len(tournaments)} tournois uniques")
+    tournaments = [t for item in raw_items if (t := parse_item(item))]
+    print(f"\nTotal : {len(tournaments)} tournois uniques parsés")
 
     # Écriture dans data/tournaments.json + commit
     os.makedirs("data", exist_ok=True)
     payload = {
         "scraped_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "count": len(tournaments),
+        "count":      len(tournaments),
         "tournaments": tournaments,
     }
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
@@ -278,10 +288,7 @@ def main():
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
     subprocess.run(["git", "add", OUTPUT_FILE], check=True)
-    result = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"],
-        capture_output=True
-    )
+    result = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if result.returncode != 0:
         msg = f"Scraping France [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] — {len(tournaments)} tournois"
         subprocess.run(["git", "commit", "-m", msg], check=True)
