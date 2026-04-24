@@ -173,15 +173,72 @@ def search_page(session, fbid, base_params, page_num):
     return [], 0, new_fbid
 
 
+def fetch_all_get(session, date_start, date_end):
+    """
+    Pagination via GET URL au lieu de POST AJAX.
+    La pagination AJAX ligue=ALL retourne toujours les mêmes items (bug Ten'Up).
+    GET ?page=N avec les cookies Playwright devrait retourner des pages différentes.
+    """
+    all_items = {}
+    start_time = datetime.now()
+
+    # Construire les params GET
+    get_params = {
+        "type": "LIGUE",
+        "ligue": "ALL",
+        "pratique": "PADEL",
+        "date[start]": date_start,
+        "date[end]":   date_end,
+    }
+
+    # Page 0 : détecter le nombre total
+    resp0 = session.get(TENUP_SEARCH, params=get_params, timeout=30)
+    soup0 = BeautifulSoup(resp0.text, "html.parser")
+
+    # Chercher les items dans le HTML
+    def extract_items_from_html(soup):
+        items = []
+        # Chercher les liens vers les tournois (pattern /tournoi/XXXX)
+        import re as _re
+        links = soup.find_all("a", href=_re.compile(r"/tournoi/\d+"))
+        seen = set()
+        for link in links:
+            m = _re.search(r"/tournoi/(\d+)", link.get("href",""))
+            if m and m.group(1) not in seen:
+                seen.add(m.group(1))
+                items.append({"id": m.group(1), "_html_link": link})
+        return items
+
+    items0 = extract_items_from_html(soup0)
+    print(f"[GET] Page 0 HTML : {len(items0)} liens tournois trouvés")
+
+    # Tester le pager HTML pour trouver le nombre de pages
+    pager = soup0.find(class_=lambda c: c and "pager" in c.lower())
+    last_page_link = None
+    if pager:
+        last_links = pager.find_all("a", href=True)
+        for a in last_links:
+            if "page=" in a.get("href",""):
+                last_page_link = a
+    print(f"[GET] Pager trouvé: {bool(pager)} — dernier lien: {last_page_link}")
+    print(f"[GET] Taille HTML page 0: {len(resp0.text)} chars")
+
+    # Si pas de résultats dans le HTML, AJAX est nécessaire
+    if not items0:
+        print("[GET] Aucun item extrait du HTML — Ten'Up nécessite AJAX pour les résultats")
+
+    return list(all_items.values())
+
+
 def fetch_all(session, fbid, base_params):
     """Pagine toute la recherche avec le fbid ligue-mode. Retourne tous les items."""
     all_items = {}
     start_time = datetime.now()
-    current_fbid = fbid  # fbid ligue-mode — NE PAS passer par refresh_fbid() (retourne ville-mode)
+    current_fbid = fbid
 
     # Page 0
     items, nb_total, current_fbid = search_page(session, current_fbid, base_params, 0)
-    print(f"Page 0 : {nb_total} résultats totaux, {len(items)} items reçus")
+    print(f"Page 0 AJAX : {nb_total} résultats totaux, {len(items)} items reçus")
     for item in items:
         all_items[str(item.get("id"))] = item
 
@@ -189,23 +246,16 @@ def fetch_all(session, fbid, base_params):
     if nb_pages > 1:
         print(f"Pagination : {nb_pages} pages à traiter...")
 
-    for page_num in range(1, nb_pages):
+    for page_num in range(1, min(nb_pages, 5)):  # Test limité à 5 pages pour le diag
         elapsed = (datetime.now() - start_time).total_seconds()
-        if elapsed > 1200:
-            print(f"⚠️  Limite temps ({elapsed:.0f}s) à page {page_num}/{nb_pages}")
-            break
         try:
             items, _, current_fbid = search_page(session, current_fbid, base_params, page_num)
-            if not items:
-                print(f"  Page {page_num} vide — arrêt")
-                break
+            n_new = sum(1 for it in items if str(it.get("id")) not in all_items)
+            print(f"  Page {page_num} AJAX : {len(items)} items reçus, {n_new} nouveaux uniques")
             for item in items:
                 all_items[str(item.get("id"))] = item
         except Exception as e:
             print(f"  Erreur page {page_num}: {e}")
-
-        if page_num % 20 == 0:
-            print(f"  Page {page_num}/{nb_pages} — {len(all_items)} tournois ({elapsed:.0f}s)")
 
     return list(all_items.values())
 
@@ -286,6 +336,11 @@ def main():
     session     = make_session(cookies)
 
     base_params = build_ligue_params(date_start, date_end)
+    # Test GET pagination
+    print("\n--- TEST GET PAGINATION ---")
+    fetch_all_get(session, date_start, date_end)
+    print("--- FIN TEST GET ---\n")
+
     raw_items   = fetch_all(session, form_build_id, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
     print(f"\nTotal : {len(tournaments)} tournois uniques")
