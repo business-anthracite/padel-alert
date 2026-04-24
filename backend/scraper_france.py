@@ -1,20 +1,18 @@
 """
 Padel Alert — Scraper France entière
-Scrape toutes les ligues françaises sur Ten'Up, envoie les résultats
-à l'endpoint WordPress /wp-json/pa/v1/ingest pour matching + notifications.
+Scrape toutes les ligues françaises sur Ten'Up, écrit les résultats dans
+data/tournaments.json (commit GitHub). WordPress pull ce fichier via WP-Cron.
 Tourne sur GitHub Actions toutes les heures.
 """
 import os
 import math
 import json
-import requests
+import subprocess
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
-# ── Config ─────────────────────────────────────────────────────────────────────
-WP_INGEST_URL    = os.environ["WP_INGEST_URL"]
-WP_INGEST_SECRET = os.environ["WP_INGEST_SECRET"]
+OUTPUT_FILE = "data/tournaments.json"
 
 TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
@@ -265,21 +263,32 @@ def main():
     tournaments = list(all_tournaments.values())
     print(f"\nTotal France : {len(tournaments)} tournois uniques")
 
-    # POST vers WordPress par lots de 50
-    BATCH_SIZE = 50
-    total_new = total_sent = 0
-    for i in range(0, len(tournaments), BATCH_SIZE):
-        batch = tournaments[i:i + BATCH_SIZE]
-        print(f"Envoi lot {i // BATCH_SIZE + 1}/{-(-len(tournaments) // BATCH_SIZE)} ({len(batch)} tournois)...")
-        payload = {"secret": WP_INGEST_SECRET, "tournaments": batch}
-        resp = requests.post(WP_INGEST_URL, json=payload, timeout=90)
-        resp.raise_for_status()
-        result = resp.json()
-        total_new  += result.get("new_tournaments", 0)
-        total_sent += result.get("alerts_sent", 0)
-        print(f"  → {result}")
+    # Écriture dans data/tournaments.json + commit
+    os.makedirs("data", exist_ok=True)
+    payload = {
+        "scraped_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "count": len(tournaments),
+        "tournaments": tournaments,
+    }
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"Fichier écrit : {OUTPUT_FILE}")
 
-    print(f"Total : {total_new} nouveaux tournois, {total_sent} alertes envoyées")
+    subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
+    subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
+    subprocess.run(["git", "add", OUTPUT_FILE], check=True)
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        capture_output=True
+    )
+    if result.returncode != 0:
+        msg = f"Scraping France [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] — {len(tournaments)} tournois"
+        subprocess.run(["git", "commit", "-m", msg], check=True)
+        subprocess.run(["git", "push"], check=True)
+        print("Commit pushé.")
+    else:
+        print("Aucun changement — pas de commit.")
+
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Terminé.")
 
 

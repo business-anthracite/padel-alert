@@ -5,12 +5,17 @@ on:
     - cron: "5 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   scrape:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:
@@ -21,8 +26,5 @@ jobs:
           pip install -r backend/requirements_france.txt
           playwright install chromium --with-deps
 
-      - name: Scraper TenUp et envoyer a WordPress
-        env:
-          WP_INGEST_URL: ${{ secrets.WP_INGEST_URL }}
-          WP_INGEST_SECRET: ${{ secrets.WP_INGEST_SECRET }}
+      - name: Scraper TenUp et ecrire tournaments.json
         run: python backend/scraper_france.py
