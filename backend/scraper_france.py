@@ -49,11 +49,23 @@ def get_session():
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(5000)
         form_build_id = page.evaluate("() => { const el=document.querySelector('input[name=\"form_build_id\"]'); return el?el.value:null; }")
+        html    = page.content()
         cookies = ctx.cookies()
         browser.close()
+
     if not form_build_id:
         raise RuntimeError("form_build_id introuvable")
     print(f"Session OK — fbid: {form_build_id[:30]}...")
+
+    # Debug : dump des champs du formulaire liés à ligue/recherche_type
+    soup = BeautifulSoup(html, "html.parser")
+    print("[DEBUG] Champs formulaire (ligue/recherche/pratique):")
+    for el in soup.find_all(["input", "select"]):
+        name = el.get("name", "")
+        if any(k in name.lower() for k in ("ligue", "recherche", "pratique")):
+            opts = [o.get("value", "") for o in el.find_all("option")] if el.name == "select" else []
+            print(f"  [{el.name}] name={name!r} value={el.get('value','')!r} options={opts}")
+
     return form_build_id, {c["name"]: c["value"] for c in cookies}
 
 
@@ -110,9 +122,22 @@ def search_page(session, base_params, page_num):
     """Exécute une page de recherche. Retourne (items, nb_total)."""
     fbid = refresh_fbid(session)
     data = {**base_params, "form_build_id": fbid, "page": str(page_num)}
+
+    if page_num == 0:
+        # Debug : afficher les params envoyés et la réponse brute
+        safe = {k: v for k, v in data.items() if "form_build_id" not in k}
+        print(f"[DEBUG] Params envoyés (page 0): {json.dumps(safe, ensure_ascii=False)}")
+
     resp = session.post(TENUP_AJAX, data=data, timeout=45)
     resp.raise_for_status()
-    for cmd in resp.json():
+    cmds = resp.json()
+
+    if page_num == 0:
+        for cmd in cmds:
+            if isinstance(cmd, dict):
+                print(f"[DEBUG] Commande reçue: {cmd.get('command')} — {str(cmd)[:200]}")
+
+    for cmd in cmds:
         if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
             results = cmd.get("results", {})
             return results.get("items", []), results.get("nb_results", 0)
