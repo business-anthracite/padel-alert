@@ -38,7 +38,24 @@ ALL_CRITERIA = {
 # ── Session (Playwright — juste pour les cookies + form_build_id) ─────────────
 
 def get_session():
+    """
+    Ouvre Ten'Up, bascule en mode ligue via click forcé (radio caché),
+    attend le rechargement AJAX du formulaire, récupère le form_build_id
+    spécifique au mode ligue + les cookies.
+    """
     print("Ouverture session Ten'Up via Playwright...")
+    ligue_fbid    = None
+    ligue_fields  = {}  # champs supplémentaires capturés depuis l'AJAX de reload
+
+    ajax_responses = []
+
+    def on_response(resp):
+        if TENUP_AJAX in resp.url and resp.status == 200:
+            try:
+                ajax_responses.append(resp.json())
+            except Exception:
+                pass
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(
@@ -46,27 +63,60 @@ def get_session():
             locale="fr-FR",
         )
         page = ctx.new_page()
+        page.on("response", on_response)
+
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(5000)
-        form_build_id = page.evaluate("() => { const el=document.querySelector('input[name=\"form_build_id\"]'); return el?el.value:null; }")
-        html    = page.content()
-        cookies = ctx.cookies()
+
+        # Cliquer le radio "ligue" avec force=True (bypass hidden)
+        ligue_radio = page.query_selector("input[value='ligue'][name='recherche_type']")
+        if ligue_radio:
+            ligue_radio.click(force=True)
+            page.wait_for_timeout(4000)   # attendre le reload AJAX du formulaire
+            print("Radio 'ligue' cliqué (force=True) — attente AJAX reload...")
+        else:
+            print("Radio 'ligue' introuvable")
+
+        # form_build_id après reload du formulaire
+        ligue_fbid = page.evaluate("() => document.querySelector('input[name=\"form_build_id\"]')?.value")
+        html_after = page.content()
+        cookies    = ctx.cookies()
         browser.close()
 
-    if not form_build_id:
-        raise RuntimeError("form_build_id introuvable")
-    print(f"Session OK — fbid: {form_build_id[:30]}...")
+    if not ligue_fbid:
+        raise RuntimeError("form_build_id introuvable après switch ligue")
 
-    # Debug : dump des champs du formulaire liés à ligue/recherche_type
-    soup = BeautifulSoup(html, "html.parser")
-    print("[DEBUG] Champs formulaire (ligue/recherche/pratique):")
+    print(f"Session ligue-mode OK — fbid: {ligue_fbid[:30]}...")
+
+    # Debug : dump champs dans le HTML après reload ligue
+    soup = BeautifulSoup(html_after, "html.parser")
+    print("[DEBUG] Champs formulaire après switch ligue:")
     for el in soup.find_all(["input", "select"]):
         name = el.get("name", "")
         if any(k in name.lower() for k in ("ligue", "recherche", "pratique")):
-            opts = [o.get("value", "") for o in el.find_all("option")] if el.name == "select" else []
+            opts = [o.get("value","") for o in el.find_all("option")] if el.name == "select" else []
             print(f"  [{el.name}] name={name!r} value={el.get('value','')!r} options={opts}")
 
-    return form_build_id, {c["name"]: c["value"] for c in cookies}
+    # Debug : AJAX responses capturées lors du switch
+    print(f"[DEBUG] AJAX responses capturées lors du switch: {len(ajax_responses)}")
+    for resp_data in ajax_responses:
+        for cmd in resp_data:
+            if isinstance(cmd, dict) and cmd.get("command") == "insert":
+                html_snippet = cmd.get("data", "")
+                if "form_build_id" in html_snippet or "ligue" in html_snippet.lower():
+                    # Extraire form_build_id depuis le snippet HTML
+                    m = re.search(r'name="form_build_id"[^>]*value="([^"]+)"', html_snippet)
+                    if m:
+                        print(f"  form_build_id depuis AJAX reload: {m.group(1)[:40]}")
+                    # Extraire les champs ligue
+                    soup2 = BeautifulSoup(html_snippet, "html.parser")
+                    for el in soup2.find_all(["input","select"]):
+                        nm = el.get("name","")
+                        if "ligue" in nm.lower():
+                            opts = [o.get("value","") for o in el.find_all("option")] if el.name == "select" else []
+                            print(f"  [AJAX] [{el.name}] name={nm!r} value={el.get('value','')!r} options={opts}")
+
+    return ligue_fbid, {c["name"]: c["value"] for c in cookies}
 
 
 def make_session(cookies_dict):
