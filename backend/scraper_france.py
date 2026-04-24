@@ -168,53 +168,60 @@ def build_ligue_params(date_start, date_end):
     }
 
 
-def search_page(session, base_params, page_num):
-    """Exécute une page de recherche. Retourne (items, nb_total)."""
-    fbid = refresh_fbid(session)
+def search_page(session, fbid, base_params, page_num):
+    """Exécute une page de recherche avec le fbid fourni. Retourne (items, nb_total, new_fbid)."""
     data = {**base_params, "form_build_id": fbid, "page": str(page_num)}
-
-    if page_num == 0:
-        # Debug : afficher les params envoyés et la réponse brute
-        safe = {k: v for k, v in data.items() if "form_build_id" not in k}
-        print(f"[DEBUG] Params envoyés (page 0): {json.dumps(safe, ensure_ascii=False)}")
-
     resp = session.post(TENUP_AJAX, data=data, timeout=45)
     resp.raise_for_status()
     cmds = resp.json()
 
-    if page_num == 0:
-        for cmd in cmds:
-            if isinstance(cmd, dict):
-                print(f"[DEBUG] Commande reçue: {cmd.get('command')} — {str(cmd)[:200]}")
+    # Extraire un fbid rafraîchi depuis la réponse si disponible
+    new_fbid = fbid
+    for cmd in cmds:
+        if isinstance(cmd, dict) and cmd.get("command") == "insert":
+            snippet = cmd.get("data", "")
+            m = re.search(r'name="form_build_id"[^>]*value="([^"]+)"', snippet)
+            if m:
+                new_fbid = m.group(1)
+                break
 
     for cmd in cmds:
         if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
             results = cmd.get("results", {})
-            return results.get("items", []), results.get("nb_results", 0)
-    return [], 0
+            return results.get("items", []), results.get("nb_results", 0), new_fbid
+
+    # Debug si aucun résultat
+    if page_num == 0:
+        for cmd in cmds:
+            if isinstance(cmd, dict):
+                print(f"[DEBUG p0] cmd={cmd.get('command')} data={str(cmd.get('data',''))[:150]}")
+
+    return [], 0, new_fbid
 
 
-def fetch_all(session, base_params):
-    """Pagine toute la recherche et retourne tous les items."""
+def fetch_all(session, fbid, base_params):
+    """Pagine toute la recherche avec le fbid ligue-mode. Retourne tous les items."""
     all_items = {}
     start_time = datetime.now()
+    current_fbid = fbid  # fbid ligue-mode — NE PAS passer par refresh_fbid() (retourne ville-mode)
 
     # Page 0
-    items, nb_total = search_page(session, base_params, 0)
-    print(f"Page 0 : {nb_total} résultats totaux, {len(items)} items")
+    items, nb_total, current_fbid = search_page(session, current_fbid, base_params, 0)
+    print(f"Page 0 : {nb_total} résultats totaux, {len(items)} items reçus")
     for item in items:
         all_items[str(item.get("id"))] = item
 
     nb_pages = math.ceil(nb_total / 30) if nb_total > 0 else 1
-    print(f"Pagination : {nb_pages} pages à traiter...")
+    if nb_pages > 1:
+        print(f"Pagination : {nb_pages} pages à traiter...")
 
     for page_num in range(1, nb_pages):
         elapsed = (datetime.now() - start_time).total_seconds()
-        if elapsed > 1200:  # 20 min max
-            print(f"⚠️  Limite temps à page {page_num}/{nb_pages}")
+        if elapsed > 1200:
+            print(f"⚠️  Limite temps ({elapsed:.0f}s) à page {page_num}/{nb_pages}")
             break
         try:
-            items, _ = search_page(session, base_params, page_num)
+            items, _, current_fbid = search_page(session, current_fbid, base_params, page_num)
             if not items:
                 print(f"  Page {page_num} vide — arrêt")
                 break
@@ -305,7 +312,7 @@ def main():
     session     = make_session(cookies)
     base_params = build_ligue_params(date_start, date_end)
 
-    raw_items   = fetch_all(session, base_params)
+    raw_items   = fetch_all(session, form_build_id, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
     print(f"\nTotal : {len(tournaments)} tournois uniques")
 
