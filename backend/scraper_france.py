@@ -8,6 +8,7 @@ import os
 import math
 import json
 import subprocess
+import requests
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
