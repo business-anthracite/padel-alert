@@ -150,13 +150,13 @@ def refresh_fbid(session):
 # ── Recherche ligue=ALL ───────────────────────────────────────────────────────
 
 def build_ligue_params(date_start, date_end):
-    """Params AJAX pour recherche ligue=ALL (toute la France, tous critères)."""
+    """
+    Params AJAX pour recherche ligue=ALL.
+    En mode ligue, le formulaire n'a que recherche_type — pas de champ ligue[autocomplete].
+    Envoyer des champs inexistants déclenche "choix interdit" côté Drupal.
+    """
     return {
         "recherche_type": "ligue",
-        "ligue[autocomplete][country]": "fr",
-        "ligue[autocomplete][textfield]": "",
-        "ligue[autocomplete][value_container][value_field]": "",
-        "ligue[autocomplete][value_container][label_field]": "",
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
