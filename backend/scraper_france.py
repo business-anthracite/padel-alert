@@ -59,36 +59,31 @@ def get_session_and_params(date_start, date_end):
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(5000)
 
-        # Basculer en mode "par ligue" si le formulaire le permet
-        ligue_radio = page.query_selector("input[value='ligue'][name='recherche_type']")
-        if ligue_radio:
-            ligue_radio.click()
-            page.wait_for_timeout(1500)
-            print("Mode 'par ligue' sélectionné")
-        else:
-            print("Pas de radio 'ligue' — formulaire en mode par défaut")
-
-        # Injecter les dates directement dans le DOM
+        # Tout injecter via JS pour bypasser les éléments cachés
         page.evaluate(f"""() => {{
-            const s = document.querySelector('[name="date[start]"]');
-            const e = document.querySelector('[name="date[end]"]');
-            if (s) {{ s.value = '{date_start}'; s.dispatchEvent(new Event('change')); }}
-            if (e) {{ e.value = '{date_end}'; e.dispatchEvent(new Event('change')); }}
+            // Mode ligue=ALL (radio peut être hidden, on force via JS)
+            const ligueRadio = document.querySelector('input[value="ligue"][name="recherche_type"]');
+            if (ligueRadio) {{
+                ligueRadio.checked = true;
+                ligueRadio.dispatchEvent(new Event('change', {{bubbles:true}}));
+            }}
+            // Dates
+            const ds = document.querySelector('[name="date[start]"]');
+            const de = document.querySelector('[name="date[end]"]');
+            if (ds) {{ ds.value = '{date_start}'; ds.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+            if (de) {{ de.value = '{date_end}'; de.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+            // PADEL
+            const padel = document.querySelector('input[name="pratique"][value="PADEL"]');
+            if (padel) {{ padel.checked = true; padel.dispatchEvent(new Event('change')); }}
+            // Cocher tous les critères
+            document.querySelectorAll(
+                'input[name^="epreuve["], input[name^="categorie_age["], input[name^="type["], input[name^="categorie_tournoi["]'
+            ).forEach(cb => {{ cb.checked = true; }});
         }}""")
-        page.wait_for_timeout(500)
+        page.wait_for_timeout(1500)
 
-        # S'assurer que PADEL est sélectionné
-        pratique = page.query_selector("input[name='pratique'][value='PADEL'], select[name='pratique']")
-        if pratique:
-            tag = pratique.evaluate("el => el.tagName")
-            if tag == "SELECT":
-                page.select_option("select[name='pratique']", "PADEL")
-            else:
-                if not pratique.is_checked():
-                    pratique.click()
-
-        # Soumettre le formulaire
-        page.click("input[name='submit_main']")
+        # Soumettre via JS (bypass actionability check)
+        page.evaluate("() => { const btn = document.querySelector('input[name=\"submit_main\"]'); if(btn) btn.click(); }")
         page.wait_for_timeout(8000)
 
         cookies = ctx.cookies()
