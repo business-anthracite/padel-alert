@@ -265,13 +265,21 @@ def main():
     tournaments = list(all_tournaments.values())
     print(f"\nTotal France : {len(tournaments)} tournois uniques")
 
-    # POST vers WordPress
-    print(f"Envoi vers {WP_INGEST_URL}...")
-    payload = {"secret": WP_INGEST_SECRET, "tournaments": tournaments}
-    resp = requests.post(WP_INGEST_URL, json=payload, timeout=60)
-    resp.raise_for_status()
-    result = resp.json()
-    print(f"Résultat : {result}")
+    # POST vers WordPress par lots de 50
+    BATCH_SIZE = 50
+    total_new = total_sent = 0
+    for i in range(0, len(tournaments), BATCH_SIZE):
+        batch = tournaments[i:i + BATCH_SIZE]
+        print(f"Envoi lot {i // BATCH_SIZE + 1}/{-(-len(tournaments) // BATCH_SIZE)} ({len(batch)} tournois)...")
+        payload = {"secret": WP_INGEST_SECRET, "tournaments": batch}
+        resp = requests.post(WP_INGEST_URL, json=payload, timeout=90)
+        resp.raise_for_status()
+        result = resp.json()
+        total_new  += result.get("new_tournaments", 0)
+        total_sent += result.get("alerts_sent", 0)
+        print(f"  → {result}")
+
+    print(f"Total : {total_new} nouveaux tournois, {total_sent} alertes envoyées")
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Terminé.")
 
 
