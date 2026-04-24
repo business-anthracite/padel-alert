@@ -173,61 +173,90 @@ def search_page(session, fbid, base_params, page_num):
     return [], 0, new_fbid
 
 
-def fetch_all_get(session, date_start, date_end):
+def intercept_next_page_click(date_start, date_end):
     """
-    Pagination via GET URL au lieu de POST AJAX.
-    La pagination AJAX ligue=ALL retourne toujours les mêmes items (bug Ten'Up).
-    GET ?page=N avec les cookies Playwright devrait retourner des pages différentes.
+    Utilise Playwright pour soumettre la recherche ligue=ALL, intercepte page 0,
+    clique sur "page suivante", et intercepte les paramètres EXACTS de cette requête.
+    Retourne (cookies, params_page0, params_page1) pour comparer.
     """
-    all_items = {}
-    start_time = datetime.now()
+    requests_intercepted = []
 
-    # Construire les params GET
-    get_params = {
-        "type": "LIGUE",
-        "ligue": "ALL",
-        "pratique": "PADEL",
-        "date[start]": date_start,
-        "date[end]":   date_end,
-    }
+    def on_request(req):
+        if TENUP_AJAX in req.url and req.method == "POST":
+            requests_intercepted.append({
+                "body": req.post_data or "",
+                "time": datetime.now().isoformat(),
+            })
 
-    # Page 0 : détecter le nombre total
-    resp0 = session.get(TENUP_SEARCH, params=get_params, timeout=30)
-    soup0 = BeautifulSoup(resp0.text, "html.parser")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            locale="fr-FR",
+        )
+        page = ctx.new_page()
+        page.on("request", on_request)
 
-    # Chercher les items dans le HTML
-    def extract_items_from_html(soup):
-        items = []
-        # Chercher les liens vers les tournois (pattern /tournoi/XXXX)
-        import re as _re
-        links = soup.find_all("a", href=_re.compile(r"/tournoi/\d+"))
-        seen = set()
-        for link in links:
-            m = _re.search(r"/tournoi/(\d+)", link.get("href",""))
-            if m and m.group(1) not in seen:
-                seen.add(m.group(1))
-                items.append({"id": m.group(1), "_html_link": link})
-        return items
+        page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(5000)
 
-    items0 = extract_items_from_html(soup0)
-    print(f"[GET] Page 0 HTML : {len(items0)} liens tournois trouvés")
+        # Cliquer ligue radio
+        ligue_radio = page.query_selector("input[value='ligue'][name='recherche_type']")
+        if ligue_radio:
+            ligue_radio.click(force=True)
+            page.wait_for_timeout(2000)
 
-    # Tester le pager HTML pour trouver le nombre de pages
-    pager = soup0.find(class_=lambda c: c and "pager" in c.lower())
-    last_page_link = None
-    if pager:
-        last_links = pager.find_all("a", href=True)
-        for a in last_links:
-            if "page=" in a.get("href",""):
-                last_page_link = a
-    print(f"[GET] Pager trouvé: {bool(pager)} — dernier lien: {last_page_link}")
-    print(f"[GET] Taille HTML page 0: {len(resp0.text)} chars")
+        # Remplir dates via JS
+        page.evaluate(f"""() => {{
+            const ds = document.querySelector('[name="date[start]"]');
+            const de = document.querySelector('[name="date[end]"]');
+            if (ds) {{ ds.value = '{date_start}'; ds.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+            if (de) {{ de.value = '{date_end}'; de.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+        }}""")
 
-    # Si pas de résultats dans le HTML, AJAX est nécessaire
-    if not items0:
-        print("[GET] Aucun item extrait du HTML — Ten'Up nécessite AJAX pour les résultats")
+        # Soumettre via JS
+        page.evaluate("() => { document.querySelector('input[name=\"submit_main\"]')?.click(); }")
+        page.wait_for_timeout(5000)
 
-    return list(all_items.values())
+        n_before_click = len(requests_intercepted)
+        print(f"[INTERCEPT] Requêtes après submit: {n_before_click}")
+
+        # Cliquer sur "page suivante" (li.pager-next > a ou bouton de pagination)
+        next_btn = page.query_selector(".pager-next a, .pager__item--next a, [data-drupal-pager-page] a, li.next a")
+        if next_btn:
+            next_btn.click()
+            page.wait_for_timeout(3000)
+            print(f"[INTERCEPT] Bouton 'next' cliqué — nouvelles requêtes: {len(requests_intercepted) - n_before_click}")
+        else:
+            # Essayer via JS : chercher un lien avec page=1
+            clicked = page.evaluate("""() => {
+                const links = document.querySelectorAll('a[href*="page="], button, [role="button"]');
+                for (const el of links) {
+                    const txt = el.textContent.trim();
+                    if (txt === '2' || txt === 'next' || txt === '›' || txt === '>') {
+                        el.click(); return txt;
+                    }
+                }
+                return null;
+            }""")
+            if clicked:
+                page.wait_for_timeout(3000)
+                print(f"[INTERCEPT] Cliqué via JS '{clicked}' — nouvelles requêtes: {len(requests_intercepted) - n_before_click}")
+            else:
+                print("[INTERCEPT] Aucun bouton 'next' trouvé")
+
+        cookies = ctx.cookies()
+        browser.close()
+
+    # Analyser les requêtes
+    print(f"\n[INTERCEPT] Total requêtes capturées: {len(requests_intercepted)}")
+    for i, req in enumerate(requests_intercepted):
+        import urllib.parse
+        parsed = urllib.parse.parse_qs(req["body"], keep_blank_values=True)
+        interesting = {k: v[0] for k, v in parsed.items() if k in ("page", "sort", "recherche_type", "_triggering_element_name", "_triggering_element_value", "form_id")}
+        print(f"  Req {i}: page={interesting.get('page','?')} trigger={interesting.get('_triggering_element_name','?')} sort={interesting.get('sort','?')}")
+
+    return {c["name"]: c["value"] for c in cookies}
 
 
 def fetch_all(session, fbid, base_params):
@@ -336,10 +365,10 @@ def main():
     session     = make_session(cookies)
 
     base_params = build_ligue_params(date_start, date_end)
-    # Test GET pagination
-    print("\n--- TEST GET PAGINATION ---")
-    fetch_all_get(session, date_start, date_end)
-    print("--- FIN TEST GET ---\n")
+    # Intercepter le clic "page suivante" pour voir les VRAIS paramètres
+    print("\n--- INTERCEPT NEXT-PAGE CLICK ---")
+    intercept_next_page_click(date_start, date_end)
+    print("--- FIN INTERCEPT ---\n")
 
     raw_items   = fetch_all(session, form_build_id, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
