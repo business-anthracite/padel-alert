@@ -8,11 +8,9 @@ WordPress pull ce fichier via WP-Cron.
 import os
 import math
 import json
-import re
 import subprocess
 import requests
 from datetime import datetime, timedelta
-from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 OUTPUT_FILE  = "data/tournaments.json"
@@ -136,23 +134,11 @@ def make_session(cookies_dict):
     return s
 
 
-def refresh_fbid(session):
-    resp = session.get(TENUP_SEARCH, timeout=30)
-    soup = BeautifulSoup(resp.text, "html.parser")
-    el = soup.find("input", {"name": "form_build_id"})
-    if el:
-        return el["value"]
-    m = re.search(r'form_build_id[^>]+value="([^"]+)"', resp.text)
-    if m:
-        return m.group(1)
-    raise RuntimeError("Impossible de rafraîchir form_build_id")
-
 
 # ── Recherche par ville ────────────────────────────────────────────────────────
 
-def search_ville_page(session, ville, date_start, date_end, page_num):
+def search_ville_page(session, fbid, ville, date_start, date_end, page_num):
     """Recherche AJAX d'une ville, page donnée. Retourne (items, nb_total)."""
-    fbid = refresh_fbid(session)
     data = {
         "recherche_type": "ville",
         "ville[autocomplete][country]": "fr",
@@ -185,18 +171,18 @@ def search_ville_page(session, ville, date_start, date_end, page_num):
     return [], 0
 
 
-def scrape_ville(session, ville, date_start, date_end):
-    """Scrape tous les tournois d'une ville (toutes les pages)."""
+def scrape_ville(session, fbid, ville, date_start, date_end):
+    """Scrape tous les tournois d'une ville (toutes les pages). Réutilise le fbid Playwright."""
     name = ville["ville_value"].split(",")[0]
     all_items = {}
 
-    items, nb_total = search_ville_page(session, ville, date_start, date_end, 0)
+    items, nb_total = search_ville_page(session, fbid, ville, date_start, date_end, 0)
     for it in items:
         all_items[str(it.get("id",""))] = it
 
     nb_pages = math.ceil(nb_total / 30) if nb_total > 0 else 1
     for page_num in range(1, nb_pages):
-        items, _ = search_ville_page(session, ville, date_start, date_end, page_num)
+        items, _ = search_ville_page(session, fbid, ville, date_start, date_end, page_num)
         if not items:
             break
         for it in items:
@@ -204,7 +190,7 @@ def scrape_ville(session, ville, date_start, date_end):
 
     n = len(all_items)
     if nb_total > 0:
-        print(f"  {name} ({RAYON}km) : {nb_total} résultats, {n} uniques ({nb_pages} pages)")
+        print(f"  {name} ({RAYON}km) : {nb_total} résultats → {n} uniques")
     return list(all_items.values())
 
 
@@ -268,48 +254,6 @@ def parse_item(item):
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
-def test_ligue_codes(session, date_start, date_end, fbid):
-    """
-    Teste les codes de ligue FFT pour voir si la pagination fonctionne ligue par ligue.
-    Codes possibles basés sur les régions administratives françaises.
-    """
-    # Codes à tester (basés sur les abréviations courantes FFT)
-    codes_to_test = ["IDF", "ARA", "PACA", "OCC", "NAQ", "PDL", "BRE", "NOR", "HDF", "GES", "BFC", "CVL", "COR",
-                     "idf", "ara", "paca", "occ",
-                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
-
-    for code in codes_to_test[:8]:  # Tester les 8 premiers pour limiter le temps
-        data = {
-            "recherche_type": "ligue",
-            "ligue": code,
-            "pratique": "PADEL",
-            "date[start]": date_start,
-            "date[end]": date_end,
-            "sort": "_DIST_",
-            "form_id": "recherche_tournois_form",
-            "_triggering_element_name": "submit_main",
-            "_triggering_element_value": "Rechercher",
-            "form_build_id": fbid,
-            "page": "0",
-        }
-        try:
-            resp = session.post(TENUP_AJAX, data=data, timeout=20)
-            cmds = resp.json()
-            for cmd in cmds:
-                if isinstance(cmd, dict):
-                    if cmd.get("command") == "recherche_tournois_update":
-                        r = cmd.get("results", {})
-                        print(f"[LIGUE={code}] ✅ nb_results={r.get('nb_results')} items={len(r.get('items',[]))}")
-                        break
-                    if cmd.get("command") == "insert" and "interdit" in cmd.get("data",""):
-                        print(f"[LIGUE={code}] ❌ choix interdit")
-                        break
-            else:
-                cmds_names = [c.get("command") for c in cmds if isinstance(c, dict)]
-                print(f"[LIGUE={code}] ? cmds={cmds_names}")
-        except Exception as e:
-            print(f"[LIGUE={code}] exception: {e}")
-
 
 def main():
     now        = datetime.now()
@@ -320,17 +264,15 @@ def main():
     form_build_id, cookies = get_session()
     session = make_session(cookies)
 
-    # ── TEST codes ligues FFT ────────────────────────────────────────────────────
-    print("\n--- TEST CODES LIGUE ---")
-    test_ligue_codes(session, date_start, date_end, form_build_id)
-    print("--- FIN TEST ---\n")
-
     all_raw = {}  # tenup_id → item
-    for ville in VILLES_FRANCE:
-        for item in scrape_ville(session, ville, date_start, date_end):
+    for i, ville in enumerate(VILLES_FRANCE, 1):
+        for item in scrape_ville(session, form_build_id, ville, date_start, date_end):
             tid = str(item.get("id", ""))
             if tid and tid not in all_raw:
                 all_raw[tid] = item
+        if i % 10 == 0:
+            elapsed = (datetime.now() - now).total_seconds()
+            print(f"  [{i}/{len(VILLES_FRANCE)}] {len(all_raw)} uniques ({elapsed:.0f}s)")
 
     tournaments = [t for item in all_raw.values() if (t := parse_item(item))]
     print(f"\nTotal France : {len(tournaments)} tournois uniques ({len(all_raw)} bruts)")
