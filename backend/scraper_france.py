@@ -310,8 +310,52 @@ def main():
 
     form_build_id, cookies = get_session()
     session     = make_session(cookies)
-    base_params = build_ligue_params(date_start, date_end)
 
+    # ── DIAGNOSTIC : test params minimaux pour isoler "choix interdit" ─────────
+    def test_params(label, params):
+        fbid2 = form_build_id
+        data = {**params, "form_build_id": fbid2, "form_id": "recherche_tournois_form",
+                "_triggering_element_name": "submit_main", "_triggering_element_value": "Rechercher"}
+        try:
+            resp = session.post(TENUP_AJAX, data=data, timeout=30)
+            cmds = resp.json()
+            for cmd in cmds:
+                if isinstance(cmd, dict):
+                    if cmd.get("command") == "recherche_tournois_update":
+                        r = cmd.get("results", {})
+                        print(f"[TEST {label}] ✅ nb_results={r.get('nb_results')} items={len(r.get('items',[]))}")
+                        return True
+                    if cmd.get("command") == "insert" and "choix interdit" in cmd.get("data",""):
+                        print(f"[TEST {label}] ❌ choix interdit")
+                        return False
+        except Exception as e:
+            print(f"[TEST {label}] ❌ exception: {e}")
+        print(f"[TEST {label}] ? aucune commande recherche_tournois_update")
+        return False
+
+    print("\n--- TESTS DIAGNOSTICS ---")
+    # Test A : minimum absolu ligue
+    test_params("A-ligue-seul", {"recherche_type": "ligue", "pratique": "PADEL",
+                                  "date[start]": date_start, "date[end]": date_end})
+    # Test B : ligue + sort=_DIST_
+    test_params("B-ligue-sort-dist", {"recherche_type": "ligue", "pratique": "PADEL",
+                                       "date[start]": date_start, "date[end]": date_end, "sort": "_DIST_"})
+    # Test C : ligue + sort=_DATE_ + ALL_CRITERIA
+    test_params("C-ligue-criteria", {**build_ligue_params(date_start, date_end)})
+    # Test D : ville=Paris sans critères (contrôle)
+    test_params("D-ville-ctrl", {"recherche_type": "ville",
+                                  "ville[autocomplete][country]": "fr",
+                                  "ville[autocomplete][textfield]": "",
+                                  "ville[autocomplete][value_container][value_field]": "Paris, 75001",
+                                  "ville[autocomplete][value_container][label_field]": "Paris",
+                                  "ville[autocomplete][value_container][lat_field]": "48.859489",
+                                  "ville[autocomplete][value_container][lng_field]": "2.347880",
+                                  "ville[distance][value_field]": "200",
+                                  "pratique": "PADEL",
+                                  "date[start]": date_start, "date[end]": date_end, "sort": "_DIST_"})
+    print("--- FIN DIAGNOSTICS ---\n")
+
+    base_params = build_ligue_params(date_start, date_end)
     raw_items   = fetch_all(session, form_build_id, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
     print(f"\nTotal : {len(tournaments)} tournois uniques")
