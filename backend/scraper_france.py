@@ -1,6 +1,6 @@
 """
-Padel Alert — Scraper France entière (v2)
-Recherche ligue=ALL via Playwright (interception requête AJAX réelle).
+Padel Alert — Scraper France entière (v3)
+Recherche ligue=ALL via AJAX manuel (même endpoint que ville, params ligue).
 Écrit data/tournaments.json + commit GitHub.
 WordPress pull ce fichier via WP-Cron.
 """
@@ -9,7 +9,7 @@ import math
 import json
 import subprocess
 import requests
-import urllib.parse
+import re
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
@@ -18,33 +18,27 @@ OUTPUT_FILE  = "data/tournaments.json"
 TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
-HORIZON_DAYS = 90   # 3 mois à venir
+HORIZON_DAYS = 90
 
 JOURS = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"]
 
+ALL_CRITERIA = {
+    "epreuve[DM]":"DM","epreuve[DD]":"DD","epreuve[DX]":"DX",
+    "categorie_age[910]":"910","categorie_age[1112]":"1112","categorie_age[1314]":"1314",
+    "categorie_age[1516]":"1516","categorie_age[1718]":"1718","categorie_age[200]":"200",
+    "categorie_age[345]":"345","categorie_age[355]":"355",
+    "type[P]":"P","type[CE]":"CE","type[CEQ]":"CEQ",
+    "categorie_tournoi[P25]":"P25","categorie_tournoi[P50]":"P50",
+    "categorie_tournoi[P100]":"P100","categorie_tournoi[P250]":"P250",
+    "categorie_tournoi[P500]":"P500","categorie_tournoi[P1000]":"P1000",
+    "categorie_tournoi[P1500]":"P1500","categorie_tournoi[P2000]":"P2000",
+}
 
-# ── Session + interception paramètres AJAX réels ──────────────────────────────
 
-def get_session_and_params(date_start, date_end):
-    """
-    Ouvre Ten'Up via Playwright, soumet la recherche ligue=ALL,
-    intercepte la vraie requête AJAX pour capturer les paramètres exacts.
-    Retourne: (cookies_dict, base_params, first_items, nb_total)
-    """
-    captured_bodies  = []
-    captured_results = []
+# ── Session (Playwright — juste pour les cookies + form_build_id) ─────────────
 
-    def on_request(req):
-        if TENUP_AJAX in req.url and req.method == "POST":
-            captured_bodies.append(req.post_data or "")
-
-    def on_response(resp):
-        if TENUP_AJAX in resp.url and resp.status == 200:
-            try:
-                captured_results.append(resp.json())
-            except Exception:
-                pass
-
+def get_session():
+    print("Ouverture session Ten'Up via Playwright...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(
@@ -52,73 +46,15 @@ def get_session_and_params(date_start, date_end):
             locale="fr-FR",
         )
         page = ctx.new_page()
-        page.on("request",  on_request)
-        page.on("response", on_response)
-
-        print("Ouverture Ten'Up via Playwright...")
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(5000)
-
-        # Tout injecter via JS pour bypasser les éléments cachés
-        page.evaluate(f"""() => {{
-            // Mode ligue=ALL (radio peut être hidden, on force via JS)
-            const ligueRadio = document.querySelector('input[value="ligue"][name="recherche_type"]');
-            if (ligueRadio) {{
-                ligueRadio.checked = true;
-                ligueRadio.dispatchEvent(new Event('change', {{bubbles:true}}));
-            }}
-            // Dates
-            const ds = document.querySelector('[name="date[start]"]');
-            const de = document.querySelector('[name="date[end]"]');
-            if (ds) {{ ds.value = '{date_start}'; ds.dispatchEvent(new Event('change', {{bubbles:true}})); }}
-            if (de) {{ de.value = '{date_end}'; de.dispatchEvent(new Event('change', {{bubbles:true}})); }}
-            // PADEL
-            const padel = document.querySelector('input[name="pratique"][value="PADEL"]');
-            if (padel) {{ padel.checked = true; padel.dispatchEvent(new Event('change')); }}
-            // Cocher tous les critères
-            document.querySelectorAll(
-                'input[name^="epreuve["], input[name^="categorie_age["], input[name^="type["], input[name^="categorie_tournoi["]'
-            ).forEach(cb => {{ cb.checked = true; }});
-        }}""")
-        page.wait_for_timeout(1500)
-
-        # Soumettre via JS (bypass actionability check)
-        page.evaluate("() => { const btn = document.querySelector('input[name=\"submit_main\"]'); if(btn) btn.click(); }")
-        page.wait_for_timeout(8000)
-
+        form_build_id = page.evaluate("() => { const el=document.querySelector('input[name=\"form_build_id\"]'); return el?el.value:null; }")
         cookies = ctx.cookies()
         browser.close()
-
-    cookies_dict = {c["name"]: c["value"] for c in cookies}
-
-    # Extraire base_params depuis la requête interceptée
-    base_params = {}
-    for body in reversed(captured_bodies):
-        parsed = urllib.parse.parse_qs(body, keep_blank_values=True)
-        if "form_id" in parsed:
-            for k, v in parsed.items():
-                if k not in ("form_build_id", "page"):
-                    base_params[k] = v[0] if len(v) == 1 else v
-            break
-
-    if not base_params:
-        raise RuntimeError("Aucun paramètre AJAX intercepté — formulaire non soumis")
-
-    # Extraire les premiers résultats
-    first_items = []
-    nb_total    = 0
-    for result_data in reversed(captured_results):
-        for cmd in result_data:
-            if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                res       = cmd.get("results", {})
-                first_items = res.get("items", [])
-                nb_total  = res.get("nb_results", 0)
-                break
-        if nb_total > 0 or first_items:
-            break
-
-    print(f"Session OK — {nb_total} tournois détectés sur la période")
-    return cookies_dict, base_params, first_items, nb_total
+    if not form_build_id:
+        raise RuntimeError("form_build_id introuvable")
+    print(f"Session OK — fbid: {form_build_id[:30]}...")
+    return form_build_id, {c["name"]: c["value"] for c in cookies}
 
 
 def make_session(cookies_dict):
@@ -140,45 +76,75 @@ def make_session(cookies_dict):
 def refresh_fbid(session):
     resp = session.get(TENUP_SEARCH, timeout=30)
     soup = BeautifulSoup(resp.text, "html.parser")
-    el   = soup.find("input", {"name": "form_build_id"})
+    el = soup.find("input", {"name": "form_build_id"})
     if el:
         return el["value"]
-    import re
     m = re.search(r'form_build_id[^>]+value="([^"]+)"', resp.text)
     if m:
         return m.group(1)
     raise RuntimeError("Impossible de rafraîchir form_build_id")
 
 
-# ── Pagination ────────────────────────────────────────────────────────────────
+# ── Recherche ligue=ALL ───────────────────────────────────────────────────────
 
-def fetch_all_pages(session, base_params, first_items, nb_total):
-    """Pagine tous les résultats et retourne tous les items."""
-    all_items = {str(item.get("id")): item for item in first_items}
-    nb_pages  = math.ceil(nb_total / 30) if nb_total > 0 else 1
-    print(f"Pagination : {nb_pages} page(s) à récupérer...")
+def build_ligue_params(date_start, date_end):
+    """Params AJAX pour recherche ligue=ALL (toute la France, tous critères)."""
+    return {
+        "recherche_type": "ligue",
+        "ligue[autocomplete][country]": "fr",
+        "ligue[autocomplete][textfield]": "",
+        "ligue[autocomplete][value_container][value_field]": "",
+        "ligue[autocomplete][value_container][label_field]": "",
+        "pratique": "PADEL",
+        "date[start]": date_start,
+        "date[end]":   date_end,
+        **ALL_CRITERIA,
+        "sort": "_DATE_",
+        "form_id": "recherche_tournois_form",
+        "_triggering_element_name":  "submit_main",
+        "_triggering_element_value": "Rechercher",
+    }
 
+
+def search_page(session, base_params, page_num):
+    """Exécute une page de recherche. Retourne (items, nb_total)."""
+    fbid = refresh_fbid(session)
+    data = {**base_params, "form_build_id": fbid, "page": str(page_num)}
+    resp = session.post(TENUP_AJAX, data=data, timeout=45)
+    resp.raise_for_status()
+    for cmd in resp.json():
+        if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
+            results = cmd.get("results", {})
+            return results.get("items", []), results.get("nb_results", 0)
+    return [], 0
+
+
+def fetch_all(session, base_params):
+    """Pagine toute la recherche et retourne tous les items."""
+    all_items = {}
     start_time = datetime.now()
+
+    # Page 0
+    items, nb_total = search_page(session, base_params, 0)
+    print(f"Page 0 : {nb_total} résultats totaux, {len(items)} items")
+    for item in items:
+        all_items[str(item.get("id"))] = item
+
+    nb_pages = math.ceil(nb_total / 30) if nb_total > 0 else 1
+    print(f"Pagination : {nb_pages} pages à traiter...")
+
     for page_num in range(1, nb_pages):
         elapsed = (datetime.now() - start_time).total_seconds()
-        if elapsed > 1200:  # 20 min max de pagination
-            print(f"⚠️  Limite de temps atteinte à la page {page_num}/{nb_pages}")
+        if elapsed > 1200:  # 20 min max
+            print(f"⚠️  Limite temps à page {page_num}/{nb_pages}")
             break
-
-        fbid = refresh_fbid(session)
-        data = {**base_params, "form_build_id": fbid, "page": str(page_num)}
         try:
-            resp = session.post(TENUP_AJAX, data=data, timeout=30)
-            resp.raise_for_status()
-            for cmd in resp.json():
-                if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                    items = cmd.get("results", {}).get("items", [])
-                    if not items:
-                        print(f"  Page {page_num} vide — arrêt")
-                        return list(all_items.values())
-                    for item in items:
-                        all_items[str(item.get("id"))] = item
-                    break
+            items, _ = search_page(session, base_params, page_num)
+            if not items:
+                print(f"  Page {page_num} vide — arrêt")
+                break
+            for item in items:
+                all_items[str(item.get("id"))] = item
         except Exception as e:
             print(f"  Erreur page {page_num}: {e}")
 
@@ -195,7 +161,7 @@ def parse_item(item):
     if not tid:
         return None
 
-    installation = item.get("installation", {})
+    installation   = item.get("installation", {})
     ville   = installation.get("ville",      item.get("villeEngagement",      ""))
     cp      = installation.get("codePostal", item.get("codePostalEngagement", ""))
     adresse = installation.get("adresse2",   item.get("adresse2Engagement",   ""))
@@ -258,22 +224,20 @@ def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
     date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Scraping France ligue=ALL ({date_start} → {date_end})")
 
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraping France (ligue=ALL, {date_start} → {date_end})")
+    form_build_id, cookies = get_session()
+    session     = make_session(cookies)
+    base_params = build_ligue_params(date_start, date_end)
 
-    cookies_dict, base_params, first_items, nb_total = get_session_and_params(date_start, date_end)
-    session = make_session(cookies_dict)
-
-    raw_items = fetch_all_pages(session, base_params, first_items, nb_total)
-
+    raw_items   = fetch_all(session, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
-    print(f"\nTotal : {len(tournaments)} tournois uniques parsés")
+    print(f"\nTotal : {len(tournaments)} tournois uniques")
 
-    # Écriture dans data/tournaments.json + commit
     os.makedirs("data", exist_ok=True)
     payload = {
-        "scraped_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "count":      len(tournaments),
+        "scraped_at":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "count":       len(tournaments),
         "tournaments": tournaments,
     }
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
@@ -283,14 +247,14 @@ def main():
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
     subprocess.run(["git", "add", OUTPUT_FILE], check=True)
-    result = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
-    if result.returncode != 0:
+    diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
+    if diff.returncode != 0:
         msg = f"Scraping France [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] — {len(tournaments)} tournois"
         subprocess.run(["git", "commit", "-m", msg], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
     else:
-        print("Aucun changement — pas de commit.")
+        print("Aucun changement.")
 
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Terminé.")
 
