@@ -1,15 +1,16 @@
 """
-Padel Alert — Scraper France entière (v3)
-Recherche ligue=ALL via AJAX manuel (même endpoint que ville, params ligue).
+Padel Alert — Scraper France entière (v5 — ville multi-points)
+45 villes, rayon 100km, recherche par ville avec ALL_CRITERIA.
+Pagination par ville (fonctionne, contrairement à ligue=ALL dont la pagination est cassée côté Ten'Up).
 Écrit data/tournaments.json + commit GitHub.
 WordPress pull ce fichier via WP-Cron.
 """
 import os
 import math
 import json
+import re
 import subprocess
 import requests
-import re
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
@@ -34,28 +35,73 @@ ALL_CRITERIA = {
     "categorie_tournoi[P1500]":"P1500","categorie_tournoi[P2000]":"P2000",
 }
 
+# ── 45 villes couvrant toute la France métropolitaine, rayon 100km ─────────────
+VILLES_FRANCE = [
+    # Île-de-France
+    {"ville_value":"Paris, 75001","ville_label":"Paris, 75, Paris, Île-de-France","lat":"48.859489","lng":"2.347880"},
+    # Auvergne-Rhône-Alpes
+    {"ville_value":"Lyon, 69001","ville_label":"Lyon, 69, Rhône, Auvergne-Rhône-Alpes","lat":"45.748834","lng":"4.846788"},
+    {"ville_value":"Grenoble, 38000","ville_label":"Grenoble, 38, Isère, Auvergne-Rhône-Alpes","lat":"45.188529","lng":"5.724524"},
+    {"ville_value":"Clermont-Ferrand, 63000","ville_label":"Clermont-Ferrand, 63, Puy-de-Dôme, Auvergne-Rhône-Alpes","lat":"45.777222","lng":"3.087025"},
+    # Provence-Alpes-Côte d'Azur
+    {"ville_value":"Marseille, 13001","ville_label":"Marseille, 13, Bouches-du-Rhône, PACA","lat":"43.296482","lng":"5.381824"},
+    {"ville_value":"Nice, 06000","ville_label":"Nice, 06, Alpes-Maritimes, PACA","lat":"43.710173","lng":"7.261953"},
+    {"ville_value":"Toulon, 83000","ville_label":"Toulon, 83, Var, PACA","lat":"43.124228","lng":"5.928000"},
+    # Occitanie
+    {"ville_value":"Toulouse, 31000","ville_label":"Toulouse, 31, Haute-Garonne, Occitanie","lat":"43.604652","lng":"1.444209"},
+    {"ville_value":"Montpellier, 34000","ville_label":"Montpellier, 34, Hérault, Occitanie","lat":"43.610769","lng":"3.876716"},
+    {"ville_value":"Perpignan, 66000","ville_label":"Perpignan, 66, Pyrénées-Orientales, Occitanie","lat":"42.698611","lng":"2.895833"},
+    {"ville_value":"Nîmes, 30000","ville_label":"Nîmes, 30, Gard, Occitanie","lat":"43.836699","lng":"4.360054"},
+    # Nouvelle-Aquitaine
+    {"ville_value":"Bordeaux, 33000","ville_label":"Bordeaux, 33, Gironde, Nouvelle-Aquitaine","lat":"44.837789","lng":"-0.579180"},
+    {"ville_value":"Bayonne, 64100","ville_label":"Bayonne, 64, Pyrénées-Atlantiques, Nouvelle-Aquitaine","lat":"43.493131","lng":"-1.474836"},
+    {"ville_value":"Limoges, 87000","ville_label":"Limoges, 87, Haute-Vienne, Nouvelle-Aquitaine","lat":"45.849998","lng":"1.250000"},
+    {"ville_value":"Poitiers, 86000","ville_label":"Poitiers, 86, Vienne, Nouvelle-Aquitaine","lat":"46.580224","lng":"0.340375"},
+    {"ville_value":"La Rochelle, 17000","ville_label":"La Rochelle, 17, Charente-Maritime, Nouvelle-Aquitaine","lat":"46.160329","lng":"-1.151139"},
+    # Pays de la Loire
+    {"ville_value":"Nantes, 44000","ville_label":"Nantes, 44, Loire-Atlantique, Pays de la Loire","lat":"47.218371","lng":"-1.553621"},
+    {"ville_value":"Le Mans, 72000","ville_label":"Le Mans, 72, Sarthe, Pays de la Loire","lat":"48.006382","lng":"0.199556"},
+    {"ville_value":"Angers, 49000","ville_label":"Angers, 49, Maine-et-Loire, Pays de la Loire","lat":"47.478419","lng":"-0.563166"},
+    # Bretagne
+    {"ville_value":"Rennes, 35000","ville_label":"Rennes, 35, Ille-et-Vilaine, Bretagne","lat":"48.117266","lng":"-1.677793"},
+    {"ville_value":"Brest, 29200","ville_label":"Brest, 29, Finistère, Bretagne","lat":"48.390394","lng":"-4.486076"},
+    # Normandie
+    {"ville_value":"Rouen, 76000","ville_label":"Rouen, 76, Seine-Maritime, Normandie","lat":"49.443232","lng":"1.099971"},
+    {"ville_value":"Caen, 14000","ville_label":"Caen, 14, Calvados, Normandie","lat":"49.182863","lng":"-0.370679"},
+    # Hauts-de-France
+    {"ville_value":"Lille, 59000","ville_label":"Lille, 59, Nord, Hauts-de-France","lat":"50.629250","lng":"3.057256"},
+    {"ville_value":"Amiens, 80000","ville_label":"Amiens, 80, Somme, Hauts-de-France","lat":"49.894067","lng":"2.295753"},
+    {"ville_value":"Valenciennes, 59300","ville_label":"Valenciennes, 59, Nord, Hauts-de-France","lat":"50.357888","lng":"3.523341"},
+    # Grand Est
+    {"ville_value":"Strasbourg, 67000","ville_label":"Strasbourg, 67, Bas-Rhin, Grand Est","lat":"48.573405","lng":"7.752111"},
+    {"ville_value":"Metz, 57000","ville_label":"Metz, 57, Moselle, Grand Est","lat":"49.119309","lng":"6.175716"},
+    {"ville_value":"Reims, 51100","ville_label":"Reims, 51, Marne, Grand Est","lat":"49.258329","lng":"4.031696"},
+    {"ville_value":"Nancy, 54000","ville_label":"Nancy, 54, Meurthe-et-Moselle, Grand Est","lat":"48.692054","lng":"6.184417"},
+    {"ville_value":"Mulhouse, 68100","ville_label":"Mulhouse, 68, Haut-Rhin, Grand Est","lat":"47.750839","lng":"7.335888"},
+    # Bourgogne-Franche-Comté
+    {"ville_value":"Dijon, 21000","ville_label":"Dijon, 21, Côte-d'Or, Bourgogne-Franche-Comté","lat":"47.322047","lng":"5.041480"},
+    {"ville_value":"Besançon, 25000","ville_label":"Besançon, 25, Doubs, Bourgogne-Franche-Comté","lat":"47.237829","lng":"6.024054"},
+    # Centre-Val de Loire
+    {"ville_value":"Orléans, 45000","ville_label":"Orléans, 45, Loiret, Centre-Val de Loire","lat":"47.902964","lng":"1.909251"},
+    {"ville_value":"Tours, 37000","ville_label":"Tours, 37, Indre-et-Loire, Centre-Val de Loire","lat":"47.394144","lng":"0.688229"},
+    {"ville_value":"Bourges, 18000","ville_label":"Bourges, 18, Cher, Centre-Val de Loire","lat":"47.083332","lng":"2.400000"},
+    # Autres villes importantes pour la couverture
+    {"ville_value":"Nîmes, 30000","ville_label":"Nîmes, 30, Gard, Occitanie","lat":"43.836699","lng":"4.360054"},
+    {"ville_value":"Aix-en-Provence, 13100","ville_label":"Aix-en-Provence, 13, Bouches-du-Rhône, PACA","lat":"43.529742","lng":"5.447427"},
+    {"ville_value":"Annecy, 74000","ville_label":"Annecy, 74, Haute-Savoie, Auvergne-Rhône-Alpes","lat":"45.899247","lng":"6.129384"},
+    {"ville_value":"Valence, 26000","ville_label":"Valence, 26, Drôme, Auvergne-Rhône-Alpes","lat":"44.933333","lng":"4.891667"},
+    {"ville_value":"Béziers, 34500","ville_label":"Béziers, 34, Hérault, Occitanie","lat":"43.344597","lng":"3.215395"},
+    {"ville_value":"Pau, 64000","ville_label":"Pau, 64, Pyrénées-Atlantiques, Nouvelle-Aquitaine","lat":"43.296346","lng":"-0.370797"},
+    {"ville_value":"Lorient, 56100","ville_label":"Lorient, 56, Morbihan, Bretagne","lat":"47.748460","lng":"-3.366950"},
+    {"ville_value":"Ajaccio, 20000","ville_label":"Ajaccio, 20, Corse-du-Sud, Corse","lat":"41.919775","lng":"8.738635"},
+]
+RAYON = "100"  # km
 
-# ── Session (Playwright — juste pour les cookies + form_build_id) ─────────────
+
+# ── Session ────────────────────────────────────────────────────────────────────
 
 def get_session():
-    """
-    Ouvre Ten'Up, bascule en mode ligue via click forcé (radio caché),
-    attend le rechargement AJAX du formulaire, récupère le form_build_id
-    spécifique au mode ligue + les cookies.
-    """
     print("Ouverture session Ten'Up via Playwright...")
-    ligue_fbid    = None
-    ligue_fields  = {}  # champs supplémentaires capturés depuis l'AJAX de reload
-
-    ajax_responses = []
-
-    def on_response(resp):
-        if TENUP_AJAX in resp.url and resp.status == 200:
-            try:
-                ajax_responses.append(resp.json())
-            except Exception:
-                pass
-
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(
@@ -63,31 +109,15 @@ def get_session():
             locale="fr-FR",
         )
         page = ctx.new_page()
-        page.on("response", on_response)
-
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(5000)
-
-        # Cliquer le radio "ligue" avec force=True (bypass hidden)
-        ligue_radio = page.query_selector("input[value='ligue'][name='recherche_type']")
-        if ligue_radio:
-            ligue_radio.click(force=True)
-            page.wait_for_timeout(4000)   # attendre le reload AJAX du formulaire
-            print("Radio 'ligue' cliqué (force=True) — attente AJAX reload...")
-        else:
-            print("Radio 'ligue' introuvable")
-
-        # form_build_id après reload du formulaire
-        ligue_fbid = page.evaluate("() => document.querySelector('input[name=\"form_build_id\"]')?.value")
-        html_after = page.content()
-        cookies    = ctx.cookies()
+        page.wait_for_timeout(6000)
+        form_build_id = page.evaluate("() => { const el=document.querySelector('input[name=\"form_build_id\"]'); return el?el.value:null; }")
+        cookies = ctx.cookies()
         browser.close()
-
-    if not ligue_fbid:
-        raise RuntimeError("form_build_id introuvable après switch ligue")
-
-    print(f"Session ligue-mode OK — fbid: {ligue_fbid[:30]}...")
-    return ligue_fbid, {c["name"]: c["value"] for c in cookies}
+    if not form_build_id:
+        raise RuntimeError("form_build_id introuvable")
+    print(f"Session OK — fbid: {form_build_id[:30]}...")
+    return form_build_id, {c["name"]: c["value"] for c in cookies}
 
 
 def make_session(cookies_dict):
@@ -118,291 +148,82 @@ def refresh_fbid(session):
     raise RuntimeError("Impossible de rafraîchir form_build_id")
 
 
-# ── Recherche ligue=ALL ───────────────────────────────────────────────────────
+# ── Recherche par ville ────────────────────────────────────────────────────────
 
-def build_ligue_params(date_start, date_end):
-    """
-    Params AJAX pour recherche ligue=ALL — SANS ALL_CRITERIA.
-    En mode ligue, les checkboxes epreuve/categorie_age/type/categorie_tournoi
-    n'existent pas dans le formulaire → envoyer = "choix interdit" Drupal.
-    Sans filtre, Ten'Up retourne tous les tournois padel (toutes catégories).
-    Le filtre par critères se fait au moment du matching dans WordPress.
-    """
-    return {
-        "recherche_type": "ligue",
+def search_ville_page(session, ville, date_start, date_end, page_num):
+    """Recherche AJAX d'une ville, page donnée. Retourne (items, nb_total)."""
+    fbid = refresh_fbid(session)
+    data = {
+        "recherche_type": "ville",
+        "ville[autocomplete][country]": "fr",
+        "ville[autocomplete][textfield]": "",
+        "ville[autocomplete][value_container][value_field]": ville["ville_value"],
+        "ville[autocomplete][value_container][label_field]": ville["ville_label"],
+        "ville[autocomplete][value_container][lat_field]":   ville["lat"],
+        "ville[autocomplete][value_container][lng_field]":   ville["lng"],
+        "ville[distance][value_field]": RAYON,
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
+        **ALL_CRITERIA,
         "sort": "_DIST_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  "submit_main",
         "_triggering_element_value": "Rechercher",
+        "form_build_id": fbid,
+        "page": str(page_num),
     }
-
-
-def search_page(session, fbid, base_params, page_num):
-    """Exécute une page de recherche avec le fbid fourni. Retourne (items, nb_total, new_fbid)."""
-    data = {**base_params, "form_build_id": fbid, "page": str(page_num)}
-    resp = session.post(TENUP_AJAX, data=data, timeout=45)
-    resp.raise_for_status()
-    cmds = resp.json()
-
-    # Extraire un fbid rafraîchi depuis la réponse si disponible
-    new_fbid = fbid
-    for cmd in cmds:
-        if isinstance(cmd, dict) and cmd.get("command") == "insert":
-            snippet = cmd.get("data", "")
-            m = re.search(r'name="form_build_id"[^>]*value="([^"]+)"', snippet)
-            if m:
-                new_fbid = m.group(1)
-                break
-
-    for cmd in cmds:
-        if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-            results = cmd.get("results", {})
-            return results.get("items", []), results.get("nb_results", 0), new_fbid
-
-    if page_num == 0:
-        cmds_names = [c.get("command") for c in cmds if isinstance(c, dict)]
-        for cmd in cmds:
-            if isinstance(cmd, dict) and cmd.get("command") == "insert":
-                d = cmd.get("data","")
-                if "interdit" in d or "erreur" in d.lower():
-                    print(f"[p0-err] {d[:200]}")
-        print(f"[p0] commandes={cmds_names} → 0 résultats")
-    return [], 0, new_fbid
-
-
-def playwright_full_session(date_start, date_end):
-    """
-    Utilise Playwright click() natif (vraie simulation souris) pour déclencher l'AJAX.
-    Retourne (cookies, items_page0, nb_total, params_page0).
-    """
-    captured_requests  = []
-    captured_responses = []
-
-    def on_request(req):
-        if TENUP_AJAX in req.url and req.method == "POST":
-            captured_requests.append({"body": req.post_data or "", "url": req.url})
-
-    def on_response(resp):
-        if TENUP_AJAX in resp.url and resp.status == 200:
-            try:
-                captured_responses.append(resp.json())
-            except Exception:
-                pass
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            locale="fr-FR",
-        )
-        page = ctx.new_page()
-        page.on("request",  on_request)
-        page.on("response", on_response)
-
-        page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(5000)
-
-        # 1. Cliquer le radio "ligue" — click() natif
-        ligue_radio = page.locator("input[value='ligue'][name='recherche_type']")
-        ligue_radio.click(force=True)
-        page.wait_for_timeout(2000)
-
-        # 2. Remplir les dates en JS (les champs peuvent être masqués)
-        page.evaluate(f"""() => {{
-            const ds = document.querySelector('[name="date[start]"]');
-            const de = document.querySelector('[name="date[end]"]');
-            if (ds) {{ ds.value = '{date_start}'; }}
-            if (de) {{ de.value = '{date_end}'; }}
-        }}""")
-        page.wait_for_timeout(500)
-
-        # 3. Cliquer "Rechercher" avec click() natif
-        submit = page.locator("input[name='submit_main']")
-        n_before = len(captured_requests)
-        submit.click(force=True)
-        page.wait_for_timeout(8000)
-
-        print(f"[PW] Après click submit : {len(captured_requests) - n_before} nouvelles requêtes AJAX")
-
-        # 4. Si résultats OK, chercher et cliquer "page 2"
-        n_before2 = len(captured_requests)
-        next_locator = page.locator("li.pager-next a, .pager__item--next a, [class*='next'] a").first
-        if next_locator.count() > 0:
-            next_locator.click()
-            page.wait_for_timeout(5000)
-            print(f"[PW] Après click next : {len(captured_requests) - n_before2} nouvelles requêtes AJAX")
-        else:
-            print("[PW] Aucun bouton 'next' trouvé dans le DOM")
-            # Screenshot du DOM pour debug
-            pager_html = page.evaluate("() => document.querySelector('[class*=\"pager\"]')?.outerHTML || 'no pager'")
-            print(f"[PW] Pager HTML: {str(pager_html)[:300]}")
-
-        cookies = ctx.cookies()
-        browser.close()
-
-    # Analyser requêtes interceptées
-    print(f"\n[PW] Total requêtes AJAX interceptées: {len(captured_requests)}")
-    for i, req in enumerate(captured_requests):
-        import urllib.parse
-        parsed = urllib.parse.parse_qs(req["body"], keep_blank_values=True)
-        interesting = {k: v[0] for k, v in parsed.items()
-                       if k in ("page","sort","recherche_type","_triggering_element_name","_triggering_element_value","pratique")}
-        print(f"  Req {i}: {interesting}")
-
-    # Extraire items page 0 des réponses capturées
-    items_p0 = []
-    nb_total  = 0
-    for resp_data in captured_responses:
-        for cmd in resp_data:
+    try:
+        resp = session.post(TENUP_AJAX, data=data, timeout=30)
+        resp.raise_for_status()
+        for cmd in resp.json():
             if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                r = cmd.get("results", {})
-                if r.get("nb_results", 0) > nb_total:
-                    nb_total  = r["nb_results"]
-                    items_p0  = r.get("items", [])
-
-    print(f"[PW] Via Playwright click: {nb_total} résultats totaux, {len(items_p0)} items capturés")
-
-    return {c["name"]: c["value"] for c in cookies}, items_p0, nb_total, captured_requests
+                results = cmd.get("results", {})
+                return results.get("items", []), results.get("nb_results", 0)
+    except Exception as e:
+        print(f"    Erreur page {page_num}: {e}")
+    return [], 0
 
 
-def intercept_next_page_click(date_start, date_end):
-    """
-    Utilise Playwright pour soumettre la recherche ligue=ALL, intercepte page 0,
-    clique sur "page suivante", et intercepte les paramètres EXACTS de cette requête.
-    Retourne (cookies, params_page0, params_page1) pour comparer.
-    """
-    requests_intercepted = []
-
-    def on_request(req):
-        if TENUP_AJAX in req.url and req.method == "POST":
-            requests_intercepted.append({
-                "body": req.post_data or "",
-                "time": datetime.now().isoformat(),
-            })
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            locale="fr-FR",
-        )
-        page = ctx.new_page()
-        page.on("request", on_request)
-
-        page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(5000)
-
-        # Cliquer ligue radio
-        ligue_radio = page.query_selector("input[value='ligue'][name='recherche_type']")
-        if ligue_radio:
-            ligue_radio.click(force=True)
-            page.wait_for_timeout(2000)
-
-        # Remplir dates via JS
-        page.evaluate(f"""() => {{
-            const ds = document.querySelector('[name="date[start]"]');
-            const de = document.querySelector('[name="date[end]"]');
-            if (ds) {{ ds.value = '{date_start}'; ds.dispatchEvent(new Event('change', {{bubbles:true}})); }}
-            if (de) {{ de.value = '{date_end}'; de.dispatchEvent(new Event('change', {{bubbles:true}})); }}
-        }}""")
-
-        # Soumettre via JS
-        page.evaluate("() => { document.querySelector('input[name=\"submit_main\"]')?.click(); }")
-        page.wait_for_timeout(5000)
-
-        n_before_click = len(requests_intercepted)
-        print(f"[INTERCEPT] Requêtes après submit: {n_before_click}")
-
-        # Cliquer sur "page suivante" (li.pager-next > a ou bouton de pagination)
-        next_btn = page.query_selector(".pager-next a, .pager__item--next a, [data-drupal-pager-page] a, li.next a")
-        if next_btn:
-            next_btn.click()
-            page.wait_for_timeout(3000)
-            print(f"[INTERCEPT] Bouton 'next' cliqué — nouvelles requêtes: {len(requests_intercepted) - n_before_click}")
-        else:
-            # Essayer via JS : chercher un lien avec page=1
-            clicked = page.evaluate("""() => {
-                const links = document.querySelectorAll('a[href*="page="], button, [role="button"]');
-                for (const el of links) {
-                    const txt = el.textContent.trim();
-                    if (txt === '2' || txt === 'next' || txt === '›' || txt === '>') {
-                        el.click(); return txt;
-                    }
-                }
-                return null;
-            }""")
-            if clicked:
-                page.wait_for_timeout(3000)
-                print(f"[INTERCEPT] Cliqué via JS '{clicked}' — nouvelles requêtes: {len(requests_intercepted) - n_before_click}")
-            else:
-                print("[INTERCEPT] Aucun bouton 'next' trouvé")
-
-        cookies = ctx.cookies()
-        browser.close()
-
-    # Analyser les requêtes
-    print(f"\n[INTERCEPT] Total requêtes capturées: {len(requests_intercepted)}")
-    for i, req in enumerate(requests_intercepted):
-        import urllib.parse
-        parsed = urllib.parse.parse_qs(req["body"], keep_blank_values=True)
-        interesting = {k: v[0] for k, v in parsed.items() if k in ("page", "sort", "recherche_type", "_triggering_element_name", "_triggering_element_value", "form_id")}
-        print(f"  Req {i}: page={interesting.get('page','?')} trigger={interesting.get('_triggering_element_name','?')} sort={interesting.get('sort','?')}")
-
-    return {c["name"]: c["value"] for c in cookies}
-
-
-def fetch_all(session, fbid, base_params):
-    """Pagine toute la recherche avec le fbid ligue-mode. Retourne tous les items."""
+def scrape_ville(session, ville, date_start, date_end):
+    """Scrape tous les tournois d'une ville (toutes les pages)."""
+    name = ville["ville_value"].split(",")[0]
     all_items = {}
-    start_time = datetime.now()
-    current_fbid = fbid
 
-    # Page 0
-    items, nb_total, current_fbid = search_page(session, current_fbid, base_params, 0)
-    print(f"Page 0 AJAX : {nb_total} résultats totaux, {len(items)} items reçus")
-    for item in items:
-        all_items[str(item.get("id"))] = item
+    items, nb_total = search_ville_page(session, ville, date_start, date_end, 0)
+    for it in items:
+        all_items[str(it.get("id",""))] = it
 
     nb_pages = math.ceil(nb_total / 30) if nb_total > 0 else 1
-    if nb_pages > 1:
-        print(f"Pagination : {nb_pages} pages à traiter...")
+    for page_num in range(1, nb_pages):
+        items, _ = search_ville_page(session, ville, date_start, date_end, page_num)
+        if not items:
+            break
+        for it in items:
+            all_items[str(it.get("id",""))] = it
 
-    for page_num in range(1, min(nb_pages, 5)):  # Test limité à 5 pages pour le diag
-        elapsed = (datetime.now() - start_time).total_seconds()
-        try:
-            items, _, current_fbid = search_page(session, current_fbid, base_params, page_num)
-            n_new = sum(1 for it in items if str(it.get("id")) not in all_items)
-            print(f"  Page {page_num} AJAX : {len(items)} items reçus, {n_new} nouveaux uniques")
-            for item in items:
-                all_items[str(item.get("id"))] = item
-        except Exception as e:
-            print(f"  Erreur page {page_num}: {e}")
-
+    n = len(all_items)
+    if nb_total > 0:
+        print(f"  {name} ({RAYON}km) : {nb_total} résultats, {n} uniques ({nb_pages} pages)")
     return list(all_items.values())
 
 
-# ── Parsing ───────────────────────────────────────────────────────────────────
+# ── Parsing ────────────────────────────────────────────────────────────────────
 
 def parse_item(item):
     tid = str(item.get("id", ""))
     if not tid:
         return None
-
     installation   = item.get("installation", {})
     ville   = installation.get("ville",      item.get("villeEngagement",      ""))
     cp      = installation.get("codePostal", item.get("codePostalEngagement", ""))
     adresse = installation.get("adresse2",   item.get("adresse2Engagement",   ""))
     lat     = installation.get("lat")
     lng     = installation.get("lng")
-
     date_debut_raw = item.get("dateDebut")
     date_debut     = date_debut_raw.get("date", "") if isinstance(date_debut_raw, dict) else ""
     date_fin_raw   = item.get("dateFin")
     date_fin       = date_fin_raw.get("date", "")   if isinstance(date_fin_raw,  dict) else ""
-
     if date_debut:
         try:
             d = datetime.strptime(date_debut[:10], "%Y-%m-%d")
@@ -414,19 +235,16 @@ def parse_item(item):
             date_str = date_debut[:10]
     else:
         date_str = "Date inconnue"
-
     epreuves_raw      = item.get("epreuves", [])
     match_types       = list({e.get("typeEpreuve",        {}).get("code", "") for e in epreuves_raw if e.get("typeEpreuve",        {}).get("code")})
     age_codes         = list({e.get("categoriePratiquant",{}).get("code", "") for e in epreuves_raw if e.get("categoriePratiquant",{}).get("code")})
     niveau_codes      = list({e.get("categorieEpreuve",   {}).get("code", "") for e in epreuves_raw if e.get("categorieEpreuve",   {}).get("code")})
     competition_codes = list({e.get("typeCompetition",    {}).get("code", "") for e in epreuves_raw if e.get("typeCompetition",    {}).get("code")})
-
     try:
         lat_f = float(lat) if lat not in (None, "", "0", 0, 0.0) else None
         lng_f = float(lng) if lng not in (None, "", "0", 0, 0.0) else None
     except (ValueError, TypeError):
         lat_f = lng_f = None
-
     return {
         "tenup_id":         tid,
         "libelle":          item.get("libelle", "Tournoi"),
@@ -448,26 +266,74 @@ def parse_item(item):
     }
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Main ───────────────────────────────────────────────────────────────────────
+
+def test_ligue_codes(session, date_start, date_end, fbid):
+    """
+    Teste les codes de ligue FFT pour voir si la pagination fonctionne ligue par ligue.
+    Codes possibles basés sur les régions administratives françaises.
+    """
+    # Codes à tester (basés sur les abréviations courantes FFT)
+    codes_to_test = ["IDF", "ARA", "PACA", "OCC", "NAQ", "PDL", "BRE", "NOR", "HDF", "GES", "BFC", "CVL", "COR",
+                     "idf", "ara", "paca", "occ",
+                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"]
+
+    for code in codes_to_test[:8]:  # Tester les 8 premiers pour limiter le temps
+        data = {
+            "recherche_type": "ligue",
+            "ligue": code,
+            "pratique": "PADEL",
+            "date[start]": date_start,
+            "date[end]": date_end,
+            "sort": "_DIST_",
+            "form_id": "recherche_tournois_form",
+            "_triggering_element_name": "submit_main",
+            "_triggering_element_value": "Rechercher",
+            "form_build_id": fbid,
+            "page": "0",
+        }
+        try:
+            resp = session.post(TENUP_AJAX, data=data, timeout=20)
+            cmds = resp.json()
+            for cmd in cmds:
+                if isinstance(cmd, dict):
+                    if cmd.get("command") == "recherche_tournois_update":
+                        r = cmd.get("results", {})
+                        print(f"[LIGUE={code}] ✅ nb_results={r.get('nb_results')} items={len(r.get('items',[]))}")
+                        break
+                    if cmd.get("command") == "insert" and "interdit" in cmd.get("data",""):
+                        print(f"[LIGUE={code}] ❌ choix interdit")
+                        break
+            else:
+                cmds_names = [c.get("command") for c in cmds if isinstance(c, dict)]
+                print(f"[LIGUE={code}] ? cmds={cmds_names}")
+        except Exception as e:
+            print(f"[LIGUE={code}] exception: {e}")
+
 
 def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
     date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Scraping France ligue=ALL ({date_start} → {date_end})")
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Scraping France — {len(VILLES_FRANCE)} villes, rayon {RAYON}km ({date_start}→{date_end})")
 
     form_build_id, cookies = get_session()
-    session     = make_session(cookies)
+    session = make_session(cookies)
 
-    base_params = build_ligue_params(date_start, date_end)
-    # Test Playwright click() natif
-    print("\n--- PLAYWRIGHT CLICK NATIF ---")
-    playwright_full_session(date_start, date_end)
-    print("--- FIN PLAYWRIGHT ---\n")
+    # ── TEST codes ligues FFT ────────────────────────────────────────────────────
+    print("\n--- TEST CODES LIGUE ---")
+    test_ligue_codes(session, date_start, date_end, form_build_id)
+    print("--- FIN TEST ---\n")
 
-    raw_items   = fetch_all(session, form_build_id, base_params)
-    tournaments = [t for item in raw_items if (t := parse_item(item))]
-    print(f"\nTotal : {len(tournaments)} tournois uniques")
+    all_raw = {}  # tenup_id → item
+    for ville in VILLES_FRANCE:
+        for item in scrape_ville(session, ville, date_start, date_end):
+            tid = str(item.get("id", ""))
+            if tid and tid not in all_raw:
+                all_raw[tid] = item
+
+    tournaments = [t for item in all_raw.values() if (t := parse_item(item))]
+    print(f"\nTotal France : {len(tournaments)} tournois uniques ({len(all_raw)} bruts)")
 
     os.makedirs("data", exist_ok=True)
     payload = {
@@ -486,18 +352,11 @@ def main():
     if diff.returncode != 0:
         msg = f"Scraping France [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] — {len(tournaments)} tournois"
         subprocess.run(["git", "commit", "-m", msg], check=True)
-        # Pull --rebase avant push pour gérer les commits automatiques parallèles
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
     else:
         print("Aucun changement.")
-
-    # Supprimer le fichier diagnostic s'il existe
-    import os as _os
-    for diag in ["backend/diag_form.py"]:
-        if _os.path.exists(diag):
-            _os.remove(diag)
 
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Terminé.")
 
