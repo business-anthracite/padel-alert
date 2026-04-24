@@ -133,7 +133,6 @@ def build_ligue_params(date_start, date_end):
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        "sort": "_DATE_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  "submit_main",
         "_triggering_element_value": "Rechercher",
@@ -162,6 +161,14 @@ def search_page(session, fbid, base_params, page_num):
             results = cmd.get("results", {})
             return results.get("items", []), results.get("nb_results", 0), new_fbid
 
+    if page_num == 0:
+        cmds_names = [c.get("command") for c in cmds if isinstance(c, dict)]
+        for cmd in cmds:
+            if isinstance(cmd, dict) and cmd.get("command") == "insert":
+                d = cmd.get("data","")
+                if "interdit" in d or "erreur" in d.lower():
+                    print(f"[p0-err] {d[:200]}")
+        print(f"[p0] commandes={cmds_names} → 0 résultats")
     return [], 0, new_fbid
 
 
