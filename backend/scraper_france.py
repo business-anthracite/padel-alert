@@ -87,35 +87,6 @@ def get_session():
         raise RuntimeError("form_build_id introuvable après switch ligue")
 
     print(f"Session ligue-mode OK — fbid: {ligue_fbid[:30]}...")
-
-    # Debug : dump champs dans le HTML après reload ligue
-    soup = BeautifulSoup(html_after, "html.parser")
-    print("[DEBUG] Champs formulaire après switch ligue:")
-    for el in soup.find_all(["input", "select"]):
-        name = el.get("name", "")
-        if any(k in name.lower() for k in ("ligue", "recherche", "pratique")):
-            opts = [o.get("value","") for o in el.find_all("option")] if el.name == "select" else []
-            print(f"  [{el.name}] name={name!r} value={el.get('value','')!r} options={opts}")
-
-    # Debug : AJAX responses capturées lors du switch
-    print(f"[DEBUG] AJAX responses capturées lors du switch: {len(ajax_responses)}")
-    for resp_data in ajax_responses:
-        for cmd in resp_data:
-            if isinstance(cmd, dict) and cmd.get("command") == "insert":
-                html_snippet = cmd.get("data", "")
-                if "form_build_id" in html_snippet or "ligue" in html_snippet.lower():
-                    # Extraire form_build_id depuis le snippet HTML
-                    m = re.search(r'name="form_build_id"[^>]*value="([^"]+)"', html_snippet)
-                    if m:
-                        print(f"  form_build_id depuis AJAX reload: {m.group(1)[:40]}")
-                    # Extraire les champs ligue
-                    soup2 = BeautifulSoup(html_snippet, "html.parser")
-                    for el in soup2.find_all(["input","select"]):
-                        nm = el.get("name","")
-                        if "ligue" in nm.lower():
-                            opts = [o.get("value","") for o in el.find_all("option")] if el.name == "select" else []
-                            print(f"  [AJAX] [{el.name}] name={nm!r} value={el.get('value','')!r} options={opts}")
-
     return ligue_fbid, {c["name"]: c["value"] for c in cookies}
 
 
@@ -151,16 +122,17 @@ def refresh_fbid(session):
 
 def build_ligue_params(date_start, date_end):
     """
-    Params AJAX pour recherche ligue=ALL.
-    En mode ligue, le formulaire n'a que recherche_type — pas de champ ligue[autocomplete].
-    Envoyer des champs inexistants déclenche "choix interdit" côté Drupal.
+    Params AJAX pour recherche ligue=ALL — SANS ALL_CRITERIA.
+    En mode ligue, les checkboxes epreuve/categorie_age/type/categorie_tournoi
+    n'existent pas dans le formulaire → envoyer = "choix interdit" Drupal.
+    Sans filtre, Ten'Up retourne tous les tournois padel (toutes catégories).
+    Le filtre par critères se fait au moment du matching dans WordPress.
     """
     return {
         "recherche_type": "ligue",
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        **ALL_CRITERIA,
         "sort": "_DATE_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  "submit_main",
@@ -189,12 +161,6 @@ def search_page(session, fbid, base_params, page_num):
         if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
             results = cmd.get("results", {})
             return results.get("items", []), results.get("nb_results", 0), new_fbid
-
-    # Debug si aucun résultat
-    if page_num == 0:
-        for cmd in cmds:
-            if isinstance(cmd, dict):
-                print(f"[DEBUG p0] cmd={cmd.get('command')} data={str(cmd.get('data',''))[:150]}")
 
     return [], 0, new_fbid
 
@@ -311,50 +277,6 @@ def main():
     form_build_id, cookies = get_session()
     session     = make_session(cookies)
 
-    # ── DIAGNOSTIC : test params minimaux pour isoler "choix interdit" ─────────
-    def test_params(label, params):
-        fbid2 = form_build_id
-        data = {**params, "form_build_id": fbid2, "form_id": "recherche_tournois_form",
-                "_triggering_element_name": "submit_main", "_triggering_element_value": "Rechercher"}
-        try:
-            resp = session.post(TENUP_AJAX, data=data, timeout=30)
-            cmds = resp.json()
-            for cmd in cmds:
-                if isinstance(cmd, dict):
-                    if cmd.get("command") == "recherche_tournois_update":
-                        r = cmd.get("results", {})
-                        print(f"[TEST {label}] ✅ nb_results={r.get('nb_results')} items={len(r.get('items',[]))}")
-                        return True
-                    if cmd.get("command") == "insert" and "choix interdit" in cmd.get("data",""):
-                        print(f"[TEST {label}] ❌ choix interdit")
-                        return False
-        except Exception as e:
-            print(f"[TEST {label}] ❌ exception: {e}")
-        print(f"[TEST {label}] ? aucune commande recherche_tournois_update")
-        return False
-
-    print("\n--- TESTS DIAGNOSTICS ---")
-    # Test A : minimum absolu ligue
-    test_params("A-ligue-seul", {"recherche_type": "ligue", "pratique": "PADEL",
-                                  "date[start]": date_start, "date[end]": date_end})
-    # Test B : ligue + sort=_DIST_
-    test_params("B-ligue-sort-dist", {"recherche_type": "ligue", "pratique": "PADEL",
-                                       "date[start]": date_start, "date[end]": date_end, "sort": "_DIST_"})
-    # Test C : ligue + sort=_DATE_ + ALL_CRITERIA
-    test_params("C-ligue-criteria", {**build_ligue_params(date_start, date_end)})
-    # Test D : ville=Paris sans critères (contrôle)
-    test_params("D-ville-ctrl", {"recherche_type": "ville",
-                                  "ville[autocomplete][country]": "fr",
-                                  "ville[autocomplete][textfield]": "",
-                                  "ville[autocomplete][value_container][value_field]": "Paris, 75001",
-                                  "ville[autocomplete][value_container][label_field]": "Paris",
-                                  "ville[autocomplete][value_container][lat_field]": "48.859489",
-                                  "ville[autocomplete][value_container][lng_field]": "2.347880",
-                                  "ville[distance][value_field]": "200",
-                                  "pratique": "PADEL",
-                                  "date[start]": date_start, "date[end]": date_end, "sort": "_DIST_"})
-    print("--- FIN DIAGNOSTICS ---\n")
-
     base_params = build_ligue_params(date_start, date_end)
     raw_items   = fetch_all(session, form_build_id, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
@@ -377,10 +299,18 @@ def main():
     if diff.returncode != 0:
         msg = f"Scraping France [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] — {len(tournaments)} tournois"
         subprocess.run(["git", "commit", "-m", msg], check=True)
+        # Pull --rebase avant push pour gérer les commits automatiques parallèles
+        subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
     else:
         print("Aucun changement.")
+
+    # Supprimer le fichier diagnostic s'il existe
+    import os as _os
+    for diag in ["backend/diag_form.py"]:
+        if _os.path.exists(diag):
+            _os.remove(diag)
 
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Terminé.")
 
