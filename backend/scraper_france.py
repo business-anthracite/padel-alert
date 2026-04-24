@@ -173,6 +173,101 @@ def search_page(session, fbid, base_params, page_num):
     return [], 0, new_fbid
 
 
+def playwright_full_session(date_start, date_end):
+    """
+    Utilise Playwright click() natif (vraie simulation souris) pour déclencher l'AJAX.
+    Retourne (cookies, items_page0, nb_total, params_page0).
+    """
+    captured_requests  = []
+    captured_responses = []
+
+    def on_request(req):
+        if TENUP_AJAX in req.url and req.method == "POST":
+            captured_requests.append({"body": req.post_data or "", "url": req.url})
+
+    def on_response(resp):
+        if TENUP_AJAX in resp.url and resp.status == 200:
+            try:
+                captured_responses.append(resp.json())
+            except Exception:
+                pass
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            locale="fr-FR",
+        )
+        page = ctx.new_page()
+        page.on("request",  on_request)
+        page.on("response", on_response)
+
+        page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(5000)
+
+        # 1. Cliquer le radio "ligue" — click() natif
+        ligue_radio = page.locator("input[value='ligue'][name='recherche_type']")
+        ligue_radio.click(force=True)
+        page.wait_for_timeout(2000)
+
+        # 2. Remplir les dates en JS (les champs peuvent être masqués)
+        page.evaluate(f"""() => {{
+            const ds = document.querySelector('[name="date[start]"]');
+            const de = document.querySelector('[name="date[end]"]');
+            if (ds) {{ ds.value = '{date_start}'; }}
+            if (de) {{ de.value = '{date_end}'; }}
+        }}""")
+        page.wait_for_timeout(500)
+
+        # 3. Cliquer "Rechercher" avec click() natif
+        submit = page.locator("input[name='submit_main']")
+        n_before = len(captured_requests)
+        submit.click(force=True)
+        page.wait_for_timeout(8000)
+
+        print(f"[PW] Après click submit : {len(captured_requests) - n_before} nouvelles requêtes AJAX")
+
+        # 4. Si résultats OK, chercher et cliquer "page 2"
+        n_before2 = len(captured_requests)
+        next_locator = page.locator("li.pager-next a, .pager__item--next a, [class*='next'] a").first
+        if next_locator.count() > 0:
+            next_locator.click()
+            page.wait_for_timeout(5000)
+            print(f"[PW] Après click next : {len(captured_requests) - n_before2} nouvelles requêtes AJAX")
+        else:
+            print("[PW] Aucun bouton 'next' trouvé dans le DOM")
+            # Screenshot du DOM pour debug
+            pager_html = page.evaluate("() => document.querySelector('[class*=\"pager\"]')?.outerHTML || 'no pager'")
+            print(f"[PW] Pager HTML: {str(pager_html)[:300]}")
+
+        cookies = ctx.cookies()
+        browser.close()
+
+    # Analyser requêtes interceptées
+    print(f"\n[PW] Total requêtes AJAX interceptées: {len(captured_requests)}")
+    for i, req in enumerate(captured_requests):
+        import urllib.parse
+        parsed = urllib.parse.parse_qs(req["body"], keep_blank_values=True)
+        interesting = {k: v[0] for k, v in parsed.items()
+                       if k in ("page","sort","recherche_type","_triggering_element_name","_triggering_element_value","pratique")}
+        print(f"  Req {i}: {interesting}")
+
+    # Extraire items page 0 des réponses capturées
+    items_p0 = []
+    nb_total  = 0
+    for resp_data in captured_responses:
+        for cmd in resp_data:
+            if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
+                r = cmd.get("results", {})
+                if r.get("nb_results", 0) > nb_total:
+                    nb_total  = r["nb_results"]
+                    items_p0  = r.get("items", [])
+
+    print(f"[PW] Via Playwright click: {nb_total} résultats totaux, {len(items_p0)} items capturés")
+
+    return {c["name"]: c["value"] for c in cookies}, items_p0, nb_total, captured_requests
+
+
 def intercept_next_page_click(date_start, date_end):
     """
     Utilise Playwright pour soumettre la recherche ligue=ALL, intercepte page 0,
@@ -365,10 +460,10 @@ def main():
     session     = make_session(cookies)
 
     base_params = build_ligue_params(date_start, date_end)
-    # Intercepter le clic "page suivante" pour voir les VRAIS paramètres
-    print("\n--- INTERCEPT NEXT-PAGE CLICK ---")
-    intercept_next_page_click(date_start, date_end)
-    print("--- FIN INTERCEPT ---\n")
+    # Test Playwright click() natif
+    print("\n--- PLAYWRIGHT CLICK NATIF ---")
+    playwright_full_session(date_start, date_end)
+    print("--- FIN PLAYWRIGHT ---\n")
 
     raw_items   = fetch_all(session, form_build_id, base_params)
     tournaments = [t for item in raw_items if (t := parse_item(item))]
