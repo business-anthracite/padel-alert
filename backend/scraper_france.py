@@ -255,67 +255,6 @@ def parse_item(item):
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 
-def test_comite(session, fbid, date_start, date_end):
-    """
-    Teste différents formats du paramètre comité dans la recherche ligue.
-    Si comite=PARIS + ligue=IDF retourne < 10000, la pagination fonctionnera.
-    """
-    base = {
-        "recherche_type": "ligue",
-        "ligue": "IDF",
-        "pratique": "PADEL",
-        "date[start]": date_start,
-        "date[end]": date_end,
-        "sort": "_DIST_",
-        "form_id": "recherche_tournois_form",
-        "_triggering_element_name": "submit_main",
-        "_triggering_element_value": "Rechercher",
-        "form_build_id": fbid,
-        "page": "0",
-    }
-
-    tests = [
-        # Format simple
-        {"comite": "PARIS"},
-        {"comite": "Paris"},
-        {"comite": "75"},
-        # Format tableau
-        {"comite[]": "PARIS"},
-        {"comite[PARIS]": "PARIS"},
-        # Format autocomplete (comme ville[autocomplete])
-        {"comite[autocomplete][value_container][value_field]": "PARIS"},
-        {"comite[autocomplete][value_container][value_field]": "75"},
-        # Sans ligue (contrôle — on sait que retourne 10000)
-        {},
-    ]
-    labels = [
-        "comite=PARIS", "comite=Paris", "comite=75",
-        "comite[]=PARIS", "comite[PARIS]=PARIS",
-        "comite[autocomplete][...]=PARIS", "comite[autocomplete][...]=75",
-        "(sans comite, contrôle)"
-    ]
-
-    print("\n=== TEST COMITÉ (ligue=IDF) ===")
-    for extra, label in zip(tests, labels):
-        data = {**base, **extra}
-        try:
-            resp = session.post(TENUP_AJAX, data=data, timeout=15)
-            for cmd in resp.json():
-                if isinstance(cmd, dict):
-                    if cmd.get("command") == "recherche_tournois_update":
-                        r = cmd.get("results", {})
-                        n = r.get("nb_results", 0)
-                        mark = "🎯" if n < 9000 else "❌"
-                        print(f"  {mark} {label:40} → nb_results={n}")
-                        break
-                    if cmd.get("command") == "insert" and "interdit" in cmd.get("data", ""):
-                        print(f"  ❌ {label:40} → choix interdit")
-                        break
-        except Exception as e:
-            print(f"  ❌ {label:40} → {e}")
-    print("=== FIN TEST ===\n")
-
-
 def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
@@ -324,8 +263,6 @@ def main():
 
     form_build_id, cookies = get_session()
     session = make_session(cookies)
-
-    test_comite(session, form_build_id, date_start, date_end)
 
     all_raw = {}  # tenup_id → item
     for i, ville in enumerate(VILLES_FRANCE, 1):
