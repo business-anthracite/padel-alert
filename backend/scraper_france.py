@@ -255,53 +255,6 @@ def parse_item(item):
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 
-def test_ligue_codes(session, fbid, date_start, date_end):
-    """Test rapide : les codes de ligue FFT fonctionnent-ils en AJAX ?"""
-    # Codes possibles : abréviations régions, nombres, formats FFT
-    CODES = [
-        # Abréviations courantes
-        "IDF", "ARA", "PACA", "OCC", "NAQ", "PDL", "BRE", "NOR", "HDF", "GES", "BFC", "CVL", "COR",
-        # En minuscules
-        "idf", "ara", "paca",
-        # Numéros
-        "1", "2", "3", "4", "5",
-        # Formats alternatifs FFT
-        "LR-IDF", "LR11", "RA",
-    ]
-    print(f"\n=== TEST CODES LIGUE FFT ({len(CODES)} codes) ===")
-    for code in CODES:
-        data = {
-            "recherche_type": "ligue",
-            "ligue": code,
-            "pratique": "PADEL",
-            "date[start]": date_start,
-            "date[end]": date_end,
-            "sort": "_DIST_",
-            "form_id": "recherche_tournois_form",
-            "_triggering_element_name": "submit_main",
-            "_triggering_element_value": "Rechercher",
-            "form_build_id": fbid,
-            "page": "0",
-        }
-        try:
-            resp = session.post(TENUP_AJAX, data=data, timeout=15)
-            for cmd in resp.json():
-                if isinstance(cmd, dict):
-                    if cmd.get("command") == "recherche_tournois_update":
-                        r = cmd.get("results", {})
-                        n = r.get("nb_results", 0)
-                        print(f"  ligue={code!r:12} → ✅ nb_results={n} items={len(r.get('items',[]))}")
-                        break
-                    if cmd.get("command") == "insert" and "interdit" in cmd.get("data", ""):
-                        print(f"  ligue={code!r:12} → ❌ choix interdit")
-                        break
-            else:
-                print(f"  ligue={code!r:12} → ? (aucune commande résultats)")
-        except Exception as e:
-            print(f"  ligue={code!r:12} → exception: {e}")
-    print("=== FIN TEST ===\n")
-
-
 def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
@@ -310,9 +263,6 @@ def main():
 
     form_build_id, cookies = get_session()
     session = make_session(cookies)
-
-    # Test codes ligue avant le scraping principal
-    test_ligue_codes(session, form_build_id, date_start, date_end)
 
     all_raw = {}  # tenup_id → item
     for i, ville in enumerate(VILLES_FRANCE, 1):
