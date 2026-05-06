@@ -1,20 +1,39 @@
 """
-Padel Alert — Diagnostic ligue v4
-Objectif : extraire les vrais noms de champs et valeurs du bloc #edit-ligue (autocomplete)
-- Force l'affichage CSS du div ligue caché
-- Extrait tous les inputs/data-refer dans ce div
-- Intercept une vraie soumission ligue via Playwright pour capturer les paramètres exacts
-- Commite data/diag_ligue.json + data/diag_screenshot_ligue.png
+Padel Alert — Diagnostic ligue v5
+Découverte clé (v4) : les ligues utilisent des checkboxes id="57_cbrappel" etc.
+Le paramètre AJAX est probablement cbrappel[]=57 (pas ligue=IDF).
+Ce diagnostic teste le format cbrappel[] avec les 18 ligues découvertes.
 """
-import json, re, time, subprocess, os, base64
+import json, time, subprocess, os
 from datetime import datetime, timedelta
 import requests
-from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
+
+# Mapping découvert en v4 (id_cbrappel → nom ligue)
+LIGUES = [
+    ("50", "AUVERGNE RHONE-ALPES"),
+    ("51", "BOURGOGNE FRANCHE COMTE"),
+    ("52", "BRETAGNE"),
+    ("53", "CENTRE VAL DE LOIRE"),
+    ("54", "CORSE"),
+    ("55", "GRAND EST"),
+    ("63", "GUADELOUPE ST MARTIN ST BARTH"),
+    ("64", "GUYANE"),
+    ("56", "HAUTS DE FRANCE"),
+    ("57", "ILE DE FRANCE"),
+    ("65", "MARTINIQUE"),
+    ("58", "NORMANDIE"),
+    ("59", "NOUVELLE AQUITAINE"),
+    ("66", "NOUVELLE CALEDONIE"),
+    ("60", "OCCITANIE"),
+    ("61", "PAYS DE LA LOIRE"),
+    ("62", "PROVENCE ALPES COTE D'AZUR"),
+    ("67", "REUNION - MAYOTTE"),
+]
 
 ALL_CRITERIA = {
     "epreuve[DM]": "DM", "epreuve[DD]": "DD", "epreuve[DX]": "DX",
@@ -30,215 +49,26 @@ ALL_CRITERIA = {
 }
 
 
-def explore_playwright():
-    result = {
-        "fbid": None, "error": None,
-        "ligue_section_html": "",
-        "ligue_section_inputs": [],
-        "ligue_dropdown_items": [],
-        "all_inputs_after_ligue_active": [],
-        "intercepted_ajax_params": None,
-        "intercepted_ajax_response_excerpt": None,
-        "screenshot_b64": None,
-    }
-    captured_reqs  = []
-    captured_resps = []
-
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            ctx = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                locale="fr-FR",
-            )
-            page = ctx.new_page()
-
-            def on_request(req):
-                if "/system/ajax" in req.url and req.method == "POST":
-                    captured_reqs.append({"post_data": req.post_data or "", "t": datetime.utcnow().isoformat()})
-            def on_response(resp):
-                if "/system/ajax" in resp.url:
-                    try:
-                        captured_resps.append({"body": resp.text()[:3000], "status": resp.status})
-                    except:
-                        pass
-            page.on("request", on_request)
-            page.on("response", on_response)
-
-            print("  Chargement Ten'Up...")
-            page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(8000)
-
-            fbid    = page.evaluate("() => document.querySelector('input[name=\"form_build_id\"]')?.value")
-            cookies = {c["name"]: c["value"] for c in ctx.cookies()}
-            result["fbid"]    = fbid
-            result["cookies"] = cookies
-            print(f"  fbid: {fbid[:40] if fbid else 'MANQUANT'}")
-
-            # ── Activer la section ligue via JS (contourne CSS display:none) ──
-            print("  Activation section ligue via JS...")
-            page.evaluate("""
-                () => {
-                    // Cliquer le radio via JS
-                    const radio = document.querySelector('#edit-recherche-type-ligue');
-                    if (radio) {
-                        radio.checked = true;
-                        ['change','input','click'].forEach(ev =>
-                            radio.dispatchEvent(new Event(ev, {bubbles:true, cancelable:true}))
-                        );
-                    }
-                    // Force-afficher la section ligue
-                    const sec = document.querySelector('#edit-ligue');
-                    if (sec) sec.style.cssText = 'display:block!important;visibility:visible!important;opacity:1!important;';
-                }
-            """)
-            page.wait_for_timeout(4000)
-
-            # ── Extraire HTML complet de #edit-ligue ──────────────────────────
-            ligue_html = page.evaluate("""
-                () => {
-                    const s = document.querySelector('#edit-ligue');
-                    return s ? s.outerHTML : 'NOT FOUND';
-                }
-            """)
-            result["ligue_section_html"] = ligue_html[:15000]
-            print(f"  Section #edit-ligue HTML : {len(ligue_html)} chars")
-
-            # ── Tous les inputs dans #edit-ligue ──────────────────────────────
-            ligue_inputs = page.evaluate("""
-                () => {
-                    const sec = document.querySelector('#edit-ligue');
-                    if (!sec) return [];
-                    return Array.from(sec.querySelectorAll('input,select,textarea,button')).map(el => ({
-                        tag:         el.tagName,
-                        name:        el.name        || '',
-                        id:          el.id          || '',
-                        type:        el.type        || '',
-                        value:       el.value       || '',
-                        placeholder: el.placeholder || '',
-                        dataRefer:   el.dataset && el.dataset.refer ? el.dataset.refer : '',
-                        class:       (el.className || '').substring(0,80),
-                    }));
-                }
-            """)
-            result["ligue_section_inputs"] = ligue_inputs
-            print(f"  Inputs dans #edit-ligue : {len(ligue_inputs)}")
-            for inp in ligue_inputs:
-                print(f"    <{inp['tag']}> name='{inp['name']}' id='{inp['id']}' value='{inp['value']}' placeholder='{inp['placeholder']}'")
-
-            # ── Items du dropdown (data-refer) ────────────────────────────────
-            dropdown_items = page.evaluate("""
-                () => {
-                    const sec = document.querySelector('#edit-ligue');
-                    if (!sec) return [];
-                    // Chercher li, [role=option], [data-refer]
-                    const items = sec.querySelectorAll('li, [role="option"], [data-refer]');
-                    return Array.from(items).map(el => ({
-                        tag:       el.tagName,
-                        text:      (el.textContent || '').trim().substring(0,80),
-                        dataRefer: el.dataset && el.dataset.refer ? el.dataset.refer : '',
-                        id:        el.id || '',
-                        value:     el.getAttribute('value') || '',
-                    })).filter(el => el.text || el.dataRefer);
-                }
-            """)
-            result["ligue_dropdown_items"] = dropdown_items
-            print(f"  Dropdown items ligue : {len(dropdown_items)}")
-            for item in dropdown_items[:20]:
-                print(f"    text='{item['text'][:50]}' data-refer='{item['dataRefer']}' id='{item['id']}'")
-
-            # ── Screenshot ────────────────────────────────────────────────────
-            try:
-                os.makedirs("data", exist_ok=True)
-                page.screenshot(path="data/diag_screenshot_ligue.png")
-                with open("data/diag_screenshot_ligue.png", "rb") as f:
-                    result["screenshot_b64"] = base64.b64encode(f.read()).decode()[:5000]
-                print("  Screenshot pris")
-            except Exception as e:
-                print(f"  Screenshot erreur: {e}")
-
-            # ── Tous les inputs du formulaire après activation ligue ──────────
-            all_inputs = page.evaluate("""
-                () => Array.from(document.querySelectorAll('input,select')).map(el => ({
-                    name:  el.name  || '',
-                    id:    el.id    || '',
-                    type:  el.type  || '',
-                    value: el.value || '',
-                    visible: el.offsetParent !== null,
-                    opts:    el.tagName==='SELECT' ? el.options.length : null,
-                })).filter(el => el.name)
-            """)
-            result["all_inputs_after_ligue_active"] = all_inputs
-
-            # ── Essai de sélection d'une ligue et soumission ──────────────────
-            # Utiliser les items dropdown trouvés pour sélectionner la première ligue réelle
-            ligue_items_real = [it for it in dropdown_items if it.get("dataRefer") and "toutes" not in it.get("text","").lower()]
-            if ligue_items_real:
-                first_ligue = ligue_items_real[0]
-                print(f"\n  Essai sélection ligue '{first_ligue['text']}' (data-refer={first_ligue['dataRefer']})...")
-                try:
-                    # Cliquer le bouton autocomplete pour ouvrir le dropdown
-                    page.click('#edit-ligue-autocomplete', force=True, timeout=5000)
-                    page.wait_for_timeout(2000)
-                    # Cliquer l'item
-                    if first_ligue["id"]:
-                        page.click(f'#{first_ligue["id"]}', force=True, timeout=5000)
-                    elif first_ligue["dataRefer"]:
-                        page.click(f'[data-refer="{first_ligue["dataRefer"]}"]', force=True, timeout=5000)
-                    page.wait_for_timeout(2000)
-                    print("  Ligue sélectionnée")
-                except Exception as e:
-                    print(f"  Erreur sélection ligue: {e}")
-
-            # ── Soumission et capture AJAX ─────────────────────────────────────
-            now = datetime.now()
-            ds  = now.strftime("%d/%m/%y")
-            de  = (now + timedelta(days=90)).strftime("%d/%m/%y")
-            for fname, val in [("date[start]", ds), ("date[end]", de)]:
-                try:
-                    el = page.query_selector(f'input[name="{fname}"]')
-                    if el:
-                        el.evaluate("(el, v) => { el.value=v; el.dispatchEvent(new Event('change',{bubbles:true})); }", val)
-                except:
-                    pass
-
-            print("  Soumission du formulaire...")
-            captured_reqs.clear(); captured_resps.clear()
-            try:
-                submit = page.query_selector('[name="submit_main"]')
-                if submit:
-                    submit.click(force=True, timeout=5000)
-                    try:
-                        page.wait_for_load_state("networkidle", timeout=15000)
-                    except:
-                        page.wait_for_timeout(6000)
-                    if captured_reqs:
-                        result["intercepted_ajax_params"] = captured_reqs[-1]["post_data"]
-                        print(f"  AJAX capturé : {captured_reqs[-1]['post_data'][:200]}")
-                    if captured_resps:
-                        result["intercepted_ajax_response_excerpt"] = captured_resps[-1]["body"][:1000]
-                else:
-                    print("  WARN: bouton submit non trouvé")
-            except Exception as e:
-                print(f"  Erreur soumission: {e}")
-
-            browser.close()
-
-    except Exception as e:
-        result["error"] = str(e)
-        print(f"  Erreur globale: {e}")
-
-    return result
+def get_session():
+    """Obtenir fbid + cookies via Playwright (page initiale seulement)."""
+    print("  Ouverture Ten'Up...")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            locale="fr-FR",
+        )
+        page = ctx.new_page()
+        page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_timeout(6000)
+        fbid    = page.evaluate("() => document.querySelector('input[name=\"form_build_id\"]')?.value")
+        cookies = {c["name"]: c["value"] for c in ctx.cookies()}
+        browser.close()
+    print(f"  fbid: {fbid[:40] if fbid else 'MANQUANT'}")
+    return fbid, cookies
 
 
-def test_structured_ligue_ajax(cookies, fbid, ligue_value, ligue_label, ligue_name_fr):
-    """
-    Teste l'AJAX avec une structure ligue[autocomplete][...] identique à ville[autocomplete][...].
-    """
-    now = datetime.now()
-    ds  = now.strftime("%d/%m/%y")
-    de  = (now + timedelta(days=90)).strftime("%d/%m/%y")
-
+def make_session(cookies):
     s = requests.Session()
     s.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -249,32 +79,45 @@ def test_structured_ligue_ajax(cookies, fbid, ligue_value, ligue_label, ligue_na
     })
     for k, v in cookies.items():
         s.cookies.set(k, v)
+    return s
 
+
+def ajax_call(session, extra_params, fbid, page_num=0):
+    """AJAX Ten'Up avec extra_params pour la ligue."""
+    now = datetime.now()
     params = {
         "recherche_type": "ligue",
-        # Structure identique à ville[autocomplete]...
-        "ligue[autocomplete][textfield]": ligue_name_fr,
-        "ligue[autocomplete][value_container][value_field]": ligue_value,
-        "ligue[autocomplete][value_container][label_field]": ligue_label,
         "pratique": "PADEL",
-        "date[start]": ds, "date[end]": de,
+        "date[start]": now.strftime("%d/%m/%y"),
+        "date[end]": (now + timedelta(days=90)).strftime("%d/%m/%y"),
         **ALL_CRITERIA,
         "sort": "_DATE_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name": "submit_main",
         "_triggering_element_value": "Rechercher",
         "form_build_id": fbid,
-        "page": "0",
+        "page": str(page_num),
     }
+    params.update(extra_params)
     try:
-        r = s.post(TENUP_AJAX, data=params, timeout=45)
+        r = requests.Session()
+        r = session.post(TENUP_AJAX, data=params, timeout=45)
         r.raise_for_status()
         cmds = r.json()
         for cmd in cmds:
             if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
                 res = cmd.get("results", {})
-                return {"nb_results": res.get("nb_results", 0), "nb_items": len(res.get("items", [])), "http": r.status_code}
-        return {"nb_results": 0, "commands": [c.get("command") for c in cmds if isinstance(c, dict)], "raw": r.text[:500], "http": r.status_code}
+                return {
+                    "nb_results": res.get("nb_results", 0),
+                    "nb_items": len(res.get("items", [])),
+                    "first_id": (res.get("items") or [{}])[0].get("id"),
+                    "http": r.status_code,
+                }
+        return {
+            "nb_results": 0, "nb_items": 0,
+            "commands": [c.get("command") for c in cmds if isinstance(c, dict)],
+            "raw": r.text[:300], "http": r.status_code,
+        }
     except Exception as e:
         return {"error": str(e)}
 
@@ -282,70 +125,104 @@ def test_structured_ligue_ajax(cookies, fbid, ligue_value, ligue_label, ligue_na
 def main():
     output = {
         "run_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "playwright": {},
-        "structured_ajax_tests": [],
+        "ligue_mapping": {lid: name for lid, name in LIGUES},
+        "tests": [],
+        "working": [],
         "conclusion": "",
     }
 
-    print("=== PHASE 1 : Exploration Playwright approfondie ===")
-    pw = explore_playwright()
-    pw_export = {k: v for k, v in pw.items() if k not in ("cookies", "screenshot_b64")}
-    output["playwright"] = pw_export
+    print("=== Session Playwright ===")
+    fbid, cookies = get_session()
+    session = make_session(cookies)
 
-    fbid    = pw.get("fbid")
-    cookies = pw.get("cookies", {})
+    print("\n=== Test 1 : cbrappel[]=XX par ligue individuelle ===")
+    for lid, name in LIGUES:
+        extra = {f"cbrappel[]": lid}
+        r0 = ajax_call(session, extra, fbid, 0)
+        nb = r0.get("nb_results", 0)
+        result = {"ligue_id": lid, "ligue_name": name, "format": "cbrappel[]=XX", "page_0": r0}
 
-    # Extraire les vraies valeurs ligue des dropdown items
-    dropdown_items = pw.get("ligue_dropdown_items", [])
-    real_ligues = [it for it in dropdown_items if it.get("dataRefer") and "toutes" not in it.get("text","").lower()]
-    print(f"\nLigues réelles trouvées dans dropdown : {len(real_ligues)}")
-    for l in real_ligues:
-        print(f"  data-refer='{l['dataRefer']}' text='{l['text']}'")
+        if nb > 30:
+            time.sleep(0.3)
+            r1 = ajax_call(session, extra, fbid, 1)
+            result["page_1"] = r1
+            result["pagination_ok"] = (
+                r0.get("first_id") is not None and r1.get("first_id") is not None
+                and r0["first_id"] != r1["first_id"]
+            )
+        else:
+            result["pagination_ok"] = None
 
-    # Extraire le nom du champ autocomplete ligue depuis les inputs
-    ligue_inputs = pw.get("ligue_section_inputs", [])
-    print(f"\nInputs section ligue: {ligue_inputs}")
+        print(f"  {'✓' if nb > 0 else '✗'} {name} (id={lid}): {nb} résultats | pagination={result.get('pagination_ok','N/A')}")
+        output["tests"].append(result)
+        if nb > 0:
+            output["working"].append({"id": lid, "name": name, "nb_results": nb, "pagination_ok": result.get("pagination_ok")})
+        time.sleep(0.3)
 
-    print("\n=== PHASE 2 : Tests AJAX structurés ligue[autocomplete][...] ===")
-    # Test avec structure style ville[autocomplete]...
-    test_values = []
-    # Depuis dropdown items découverts
-    for it in real_ligues[:5]:
-        test_values.append((it["dataRefer"], it["text"], it["text"]))
-    # Fallback : quelques ligues hardcodées si rien trouvé
-    if not test_values:
-        test_values = [
-            ("ILE-DE-FRANCE",        "ILE-DE-FRANCE",        "Île-de-France"),
-            ("PROVENCE-ALPES-COTE",  "PROVENCE-ALPES-COTE",  "Provence-Alpes-Côte d'Azur"),
+    print("\n=== Test 2 : formats alternatifs (si test 1 échoue) ===")
+    if not output["working"]:
+        alt_tests = [
+            # ligue=57
+            ({"ligue": "57"},      "ligue=57 (IDF)"),
+            ({"ligue": "62"},      "ligue=62 (PACA)"),
+            # cbrappel=57 (sans crochets)
+            ({"cbrappel": "57"},   "cbrappel=57 sans [] (IDF)"),
+            # ligue[cbrappel][]=57
+            ({"ligue[cbrappel][]": "57"}, "ligue[cbrappel][]=57 (IDF)"),
+            # comite_ligue[]=57
+            ({"comite_ligue[]": "57"}, "comite_ligue[]=57 (IDF)"),
         ]
+        for extra, label in alt_tests:
+            r0 = ajax_call(session, extra, fbid, 0)
+            nb = r0.get("nb_results", 0)
+            print(f"  {'✓' if nb > 0 else '✗'} {label}: {nb} résultats")
+            output["tests"].append({"format": label, "page_0": r0, "nb_results": nb})
+            if nb > 0:
+                output["working"].append({"format": label, "nb_results": nb})
+            time.sleep(0.3)
 
-    for val, label, name_fr in test_values[:5]:
-        print(f"  Test ligue[autocomplete] value='{val}'...")
-        t = test_structured_ligue_ajax(cookies, fbid, val, label, name_fr)
-        print(f"    → {t}")
-        output["structured_ajax_tests"].append({"value": val, "label": label, "result": t})
-        time.sleep(0.5)
+    print("\n=== Test 3 : toutes ligues en même temps ===")
+    all_ids_extra = {}
+    for lid, _ in LIGUES:
+        # requests encode les paramètres en lists automatiquement si on passe une list
+        # Mais avec data=dict, cbrappel[]=XX doit être encodé différemment
+    # Utiliser une liste de tuples pour multi-value
+    all_ids_params_list = [("cbrappel[]", lid) for lid, _ in LIGUES]
+    all_ids_params_list += [
+        ("recherche_type", "ligue"),
+        ("pratique", "PADEL"),
+        ("date[start]", datetime.now().strftime("%d/%m/%y")),
+        ("date[end]", (datetime.now() + timedelta(days=90)).strftime("%d/%m/%y")),
+        ("sort", "_DATE_"),
+        ("form_id", "recherche_tournois_form"),
+        ("_triggering_element_name", "submit_main"),
+        ("_triggering_element_value", "Rechercher"),
+        ("form_build_id", fbid),
+        ("page", "0"),
+    ] + list(ALL_CRITERIA.items())
 
-    # Analyse du paramètre AJAX intercepté
-    intercepted = pw.get("intercepted_ajax_params", "")
-    if intercepted:
-        print(f"\n=== PARAMÈTRE AJAX INTERCEPTÉ ===")
-        print(intercepted[:1000])
-        output["intercepted_params_raw"] = intercepted
+    try:
+        r = session.post(TENUP_AJAX, data=all_ids_params_list, timeout=45)
+        r.raise_for_status()
+        cmds = r.json()
+        nb_all = 0
+        for cmd in cmds:
+            if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
+                nb_all = cmd.get("results", {}).get("nb_results", 0)
+                break
+        print(f"  Toutes ligues (cbrappel[]=50..67): {nb_all} résultats")
+        output["all_ligues_test"] = {"nb_results": nb_all}
+    except Exception as e:
+        print(f"  Erreur: {e}")
+        output["all_ligues_test"] = {"error": str(e)}
 
+    # Résumé
     print(f"\n=== RÉSUMÉ ===")
-    working = [t for t in output["structured_ajax_tests"] if t["result"].get("nb_results", 0) > 0]
-    print(f"Tests structurés avec résultats: {len(working)}/{len(output['structured_ajax_tests'])}")
-    if intercepted:
-        print(f"Paramètre AJAX intercepté: OUI ({len(intercepted)} chars)")
-    else:
-        print("Paramètre AJAX intercepté: NON")
+    print(f"Format cbrappel[] : {len(output['working'])} ligues avec résultats")
+    for w in output["working"]:
+        print(f"  {w}")
 
-    output["conclusion"] = (
-        f"dropdown_items={len(real_ligues)}, "
-        f"intercepted={'OUI' if intercepted else 'NON'}, "
-        f"ajax_working={len(working)}/{len(output['structured_ajax_tests'])}"
-    )
+    output["conclusion"] = f"working={len(output['working'])}/18, all_ligues={output.get('all_ligues_test', {}).get('nb_results', 'N/A')}"
 
     os.makedirs("data", exist_ok=True)
     with open("data/diag_ligue.json", "w", encoding="utf-8") as f:
@@ -354,13 +231,10 @@ def main():
 
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
-    files = ["data/diag_ligue.json"]
-    if os.path.exists("data/diag_screenshot_ligue.png"):
-        files.append("data/diag_screenshot_ligue.png")
-    subprocess.run(["git", "add"] + files, check=True)
+    subprocess.run(["git", "add", "data/diag_ligue.json"], check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if diff.returncode != 0:
-        subprocess.run(["git", "commit", "-m", f"diag_ligue v4 [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
+        subprocess.run(["git", "commit", "-m", f"diag_ligue v5 cbrappel[] [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
