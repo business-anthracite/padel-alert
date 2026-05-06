@@ -1,1042 +1,434 @@
 {
-  "run_at": "2026-05-06T16:43:00Z",
-  "playwright": {
-    "fbid": "form-TaQr20CWQ0EROhfS35yFm_D1RDKJDB4xgbGF-NoheEQ",
-    "error": null,
-    "ligue_section_html": "<div id=\"edit-ligue\" class=\"form-wrapper form-group\" style=\"display: block !important; visibility: visible !important; opacity: 1 !important;\"><button class=\"button_ligue_vuejs button-autocomplete-ligue form-submit recherche_tournois_vuejs_anchor-processed buttonLigue-processed\" type=\"submit\" id=\"edit-ligue-autocomplete\" name=\"op\" value=\"Dans quelle ligue voulez-vous jouer ?\">Dans quelle ligue voulez-vous jouer ?</button>\n<div id=\"comite-modal-vue\" class=\"ctools-modal-recherche-tournois-popin btn-cancel btn-default btn form-submit\" data-comite=\"false\" style=\"display: none;\">Voir tous les comités</div><div id=\"app\" style=\"display: none;\"><div class=\"wrapper-creneau-modal\"><div id=\"overlay-modal-creneau\"><div class=\"display-modal-creneau\"><div role=\"document\" class=\"modal-dialog\"><div class=\"modal-content\"><div class=\"modal-header\"><button type=\"button\" data-dismiss=\"modal\" aria-label=\"Close\" class=\"close\"><span aria-hidden=\"true\" class=\"meticon-times\"></span></button> <h4 class=\"modal-title\">\n      Sélectionnez une ou plusieurs ligues\n    </h4></div> <div class=\"modal-body modale-ligue\"><!----> <div class=\"overflow-modal\"><div class=\"overflow-ligues-inner\"><div class=\"row\"><div class=\"col-xs-12 col-sm-6\"><div class=\"form-item form-type-checkbox\"><input id=\"all_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"all_cbrappel\">Toutes les ligues</label></div> <div class=\"form-item form-type-checkbox\"><input id=\"50_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"50_cbrappel\">AUVERGNE RHONE-ALPES</label></div><div class=\"form-item form-type-checkbox\"><input id=\"51_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"51_cbrappel\">BOURGOGNE FRANCHE COMTE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"52_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"52_cbrappel\">BRETAGNE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"53_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"53_cbrappel\">CENTRE VAL DE LOIRE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"54_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"54_cbrappel\">CORSE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"55_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"55_cbrappel\">GRAND EST</label></div><div class=\"form-item form-type-checkbox\"><input id=\"63_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"63_cbrappel\">GUADELOUPE ST MARTIN ST BARTH</label></div><div class=\"form-item form-type-checkbox\"><input id=\"64_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"64_cbrappel\">GUYANE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"56_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"56_cbrappel\">HAUTS DE FRANCE</label></div></div> <div class=\"col-xs-12 col-sm-6\"><div class=\"form-item form-type-checkbox\"><input id=\"57_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"57_cbrappel\">ILE DE FRANCE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"65_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"65_cbrappel\">MARTINIQUE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"58_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"58_cbrappel\">NORMANDIE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"59_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"59_cbrappel\">NOUVELLE AQUITAINE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"66_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"66_cbrappel\">NOUVELLE CALEDONIE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"60_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"60_cbrappel\">OCCITANIE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"61_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"61_cbrappel\">PAYS DE LA LOIRE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"62_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"62_cbrappel\">PROVENCE ALPES COTE D'AZUR</label></div><div class=\"form-item form-type-checkbox\"><input id=\"67_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"67_cbrappel\">REUNION - MAYOTTE</label></div></div></div></div></div> <div class=\"text-center mb40\"><a href=\"#\" class=\"btn-primary disabled\">SUIVANT</a></div></div></div></div></div></div></div></div></div>",
-    "ligue_section_inputs": [
-      {
-        "tag": "BUTTON",
-        "name": "op",
-        "id": "edit-ligue-autocomplete",
-        "type": "submit",
-        "value": "Dans quelle ligue voulez-vous jouer ?",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": "button_ligue_vuejs button-autocomplete-ligue form-submit recherche_tournois_vuej"
-      },
-      {
-        "tag": "BUTTON",
-        "name": "",
-        "id": "",
-        "type": "button",
-        "value": "",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": "close"
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "all_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "50_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "51_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "52_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "53_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "54_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "55_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "63_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "64_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "56_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "57_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "65_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "58_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "59_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "66_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "60_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "61_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "62_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      },
-      {
-        "tag": "INPUT",
-        "name": "",
-        "id": "67_cbrappel",
-        "type": "checkbox",
-        "value": "on",
-        "placeholder": "",
-        "dataRefer": "",
-        "class": ""
-      }
-    ],
-    "ligue_dropdown_items": [],
-    "all_inputs_after_ligue_active": [
-      {
-        "name": "recherche_type",
-        "id": "edit-recherche-type-ville",
-        "type": "radio",
-        "value": "ville",
-        "visible": true,
-        "opts": null
-      },
-      {
-        "name": "recherche_type",
-        "id": "edit-recherche-type-club",
-        "type": "radio",
-        "value": "club",
-        "visible": true,
-        "opts": null
-      },
-      {
-        "name": "recherche_type",
-        "id": "edit-recherche-type-ligue",
-        "type": "radio",
-        "value": "ligue",
-        "visible": true,
-        "opts": null
-      },
-      {
-        "name": "ville[autocomplete][country]",
-        "id": "edit-ville-autocomplete-country",
-        "type": "select-one",
-        "value": "fr",
-        "visible": false,
-        "opts": 13
-      },
-      {
-        "name": "ville[autocomplete][textfield]",
-        "id": "autocomplete-custom-input",
-        "type": "search",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "ville[autocomplete][value_container][value_field]",
-        "id": "edit-ville-autocomplete-value-container-value-field",
-        "type": "text",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "ville[autocomplete][value_container][label_field]",
-        "id": "edit-ville-autocomplete-value-container-label-field",
-        "type": "text",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "ville[autocomplete][value_container][lat_field]",
-        "id": "",
-        "type": "hidden",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "ville[autocomplete][value_container][lng_field]",
-        "id": "",
-        "type": "hidden",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "ville[distance][value_field]",
-        "id": "",
-        "type": "hidden",
-        "value": "30",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "club[autocomplete][textfield]",
-        "id": "autocomplete-custom-input--2",
-        "type": "text",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "club[autocomplete][value_container][value_field]",
-        "id": "edit-club-autocomplete-value-container-value-field",
-        "type": "text",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "club[autocomplete][value_container][label_field]",
-        "id": "edit-club-autocomplete-value-container-label-field",
-        "type": "text",
-        "value": "",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "pratique",
-        "id": "edit-pratique-tennis",
-        "type": "radio",
-        "value": "TENNIS",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "pratique",
-        "id": "edit-pratique-padel",
-        "type": "radio",
-        "value": "PADEL",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "pratique",
-        "id": "edit-pratique-beach",
-        "type": "radio",
-        "value": "BEACH",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "pratique",
-        "id": "edit-pratique-pickle",
-        "type": "radio",
-        "value": "PICKLE",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "date[start]",
-        "id": "date-range-custom-input-start",
-        "type": "text",
-        "value": "06/05/26",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "date[end]",
-        "id": "date-range-custom-input-end",
-        "type": "text",
-        "value": "06/08/26",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "epreuve[SM]",
-        "id": "edit-epreuve-sm",
-        "type": "checkbox",
-        "value": "SM",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "epreuve[SD]",
-        "id": "edit-epreuve-sd",
-        "type": "checkbox",
-        "value": "SD",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "epreuve[DX]",
-        "id": "edit-epreuve-dx",
-        "type": "checkbox",
-        "value": "DX",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "epreuve[DM]",
-        "id": "edit-epreuve-dm",
-        "type": "checkbox",
-        "value": "DM",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "epreuve[DD]",
-        "id": "edit-epreuve-dd",
-        "type": "checkbox",
-        "value": "DD",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[70|80|96|97|98|90|95|65|99|100]",
-        "id": "edit-categorie-age-708096979890956599100",
-        "type": "checkbox",
-        "value": "70|80|96|97|98|90|95|65|99|100",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[110]",
-        "id": "edit-categorie-age-110",
-        "type": "checkbox",
-        "value": "110",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[120]",
-        "id": "edit-categorie-age-120",
-        "type": "checkbox",
-        "value": "120",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[125]",
-        "id": "edit-categorie-age-125",
-        "type": "checkbox",
-        "value": "125",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[130]",
-        "id": "edit-categorie-age-130",
-        "type": "checkbox",
-        "value": "130",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[140]",
-        "id": "edit-categorie-age-140",
-        "type": "checkbox",
-        "value": "140",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[145]",
-        "id": "edit-categorie-age-145",
-        "type": "checkbox",
-        "value": "145",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[160]",
-        "id": "edit-categorie-age-160",
-        "type": "checkbox",
-        "value": "160",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[180]",
-        "id": "edit-categorie-age-180",
-        "type": "checkbox",
-        "value": "180",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[200]",
-        "id": "edit-categorie-age-200",
-        "type": "checkbox",
-        "value": "200",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[350]",
-        "id": "edit-categorie-age-350",
-        "type": "checkbox",
-        "value": "350",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[400]",
-        "id": "edit-categorie-age-400",
-        "type": "checkbox",
-        "value": "400",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[450]",
-        "id": "edit-categorie-age-450",
-        "type": "checkbox",
-        "value": "450",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[500]",
-        "id": "edit-categorie-age-500",
-        "type": "checkbox",
-        "value": "500",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[550]",
-        "id": "edit-categorie-age-550",
-        "type": "checkbox",
-        "value": "550",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[600]",
-        "id": "edit-categorie-age-600",
-        "type": "checkbox",
-        "value": "600",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[650]",
-        "id": "edit-categorie-age-650",
-        "type": "checkbox",
-        "value": "650",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[700]",
-        "id": "edit-categorie-age-700",
-        "type": "checkbox",
-        "value": "700",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[750]",
-        "id": "edit-categorie-age-750",
-        "type": "checkbox",
-        "value": "750",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "categorie_age[800]",
-        "id": "edit-categorie-age-800",
-        "type": "checkbox",
-        "value": "800",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "type[T]",
-        "id": "edit-type-t",
-        "type": "checkbox",
-        "value": "T",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "type[C]",
-        "id": "edit-type-c",
-        "type": "checkbox",
-        "value": "C",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "tournois_interne",
-        "id": "edit-tournois-interne-0",
-        "type": "radio",
-        "value": "0",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "tournois_interne",
-        "id": "edit-tournois-interne-1",
-        "type": "radio",
-        "value": "1",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[TRADI]",
-        "id": "edit-famille-tournois-tradi",
-        "type": "checkbox",
-        "value": "TRADI",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[MULTI]",
-        "id": "edit-famille-tournois-multi",
-        "type": "checkbox",
-        "value": "MULTI",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[TMC_D]",
-        "id": "edit-famille-tournois-tmc-d",
-        "type": "checkbox",
-        "value": "TMC_D",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[TMC_M]",
-        "id": "edit-famille-tournois-tmc-m",
-        "type": "checkbox",
-        "value": "TMC_M",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[COURT_ADUL]",
-        "id": "edit-famille-tournois-court-adul",
-        "type": "checkbox",
-        "value": "COURT_ADUL",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[TRADI_V]",
-        "id": "edit-famille-tournois-tradi-v",
-        "type": "checkbox",
-        "value": "TRADI_V",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[MULTI_V]",
-        "id": "edit-famille-tournois-multi-v",
-        "type": "checkbox",
-        "value": "MULTI_V",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[GALAXIE_O]",
-        "id": "edit-famille-tournois-galaxie-o",
-        "type": "checkbox",
-        "value": "GALAXIE_O",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[GALAXIE_V]",
-        "id": "edit-famille-tournois-galaxie-v",
-        "type": "checkbox",
-        "value": "GALAXIE_V",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[CNGT]",
-        "id": "edit-famille-tournois-cngt",
-        "type": "checkbox",
-        "value": "CNGT",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "famille_tournois[NTC]",
-        "id": "edit-famille-tournois-ntc",
-        "type": "checkbox",
-        "value": "NTC",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "surface[B_PIL]",
-        "id": "edit-surface-b-pil",
-        "type": "checkbox",
-        "value": "B_PIL",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "surface[DUR  ]",
-        "id": "edit-surface-dur-",
-        "type": "checkbox",
-        "value": "DUR  ",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "surface[GAZON]",
-        "id": "edit-surface-gazon",
-        "type": "checkbox",
-        "value": "GAZON",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "surface[AUTRE]",
-        "id": "edit-surface-autre",
-        "type": "checkbox",
-        "value": "AUTRE",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "inscription_ligne",
-        "id": "edit-inscription-ligne-0",
-        "type": "radio",
-        "value": "0",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "inscription_ligne",
-        "id": "edit-inscription-ligne-1",
-        "type": "radio",
-        "value": "1",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "paiement_ligne",
-        "id": "edit-paiement-ligne-0",
-        "type": "radio",
-        "value": "0",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "paiement_ligne",
-        "id": "edit-paiement-ligne-1",
-        "type": "radio",
-        "value": "1",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "limitation_classements",
-        "id": "edit-limitation-classements",
-        "type": "checkbox",
-        "value": "1",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10060]",
-        "id": "edit-classements-10060",
-        "type": "checkbox",
-        "value": "10060",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10063]",
-        "id": "edit-classements-10063",
-        "type": "checkbox",
-        "value": "10063",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10064]",
-        "id": "edit-classements-10064",
-        "type": "checkbox",
-        "value": "10064",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10065]",
-        "id": "edit-classements-10065",
-        "type": "checkbox",
-        "value": "10065",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10070]",
-        "id": "edit-classements-10070",
-        "type": "checkbox",
-        "value": "10070",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10080]",
-        "id": "edit-classements-10080",
-        "type": "checkbox",
-        "value": "10080",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10090]",
-        "id": "edit-classements-10090",
-        "type": "checkbox",
-        "value": "10090",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10100]",
-        "id": "edit-classements-10100",
-        "type": "checkbox",
-        "value": "10100",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10110]",
-        "id": "edit-classements-10110",
-        "type": "checkbox",
-        "value": "10110",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10120]",
-        "id": "edit-classements-10120",
-        "type": "checkbox",
-        "value": "10120",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10130]",
-        "id": "edit-classements-10130",
-        "type": "checkbox",
-        "value": "10130",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10140]",
-        "id": "edit-classements-10140",
-        "type": "checkbox",
-        "value": "10140",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10150]",
-        "id": "edit-classements-10150",
-        "type": "checkbox",
-        "value": "10150",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10160]",
-        "id": "edit-classements-10160",
-        "type": "checkbox",
-        "value": "10160",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10170]",
-        "id": "edit-classements-10170",
-        "type": "checkbox",
-        "value": "10170",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10180]",
-        "id": "edit-classements-10180",
-        "type": "checkbox",
-        "value": "10180",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10190]",
-        "id": "edit-classements-10190",
-        "type": "checkbox",
-        "value": "10190",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10200]",
-        "id": "edit-classements-10200",
-        "type": "checkbox",
-        "value": "10200",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10210]",
-        "id": "edit-classements-10210",
-        "type": "checkbox",
-        "value": "10210",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10220]",
-        "id": "edit-classements-10220",
-        "type": "checkbox",
-        "value": "10220",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10230]",
-        "id": "edit-classements-10230",
-        "type": "checkbox",
-        "value": "10230",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10240]",
-        "id": "edit-classements-10240",
-        "type": "checkbox",
-        "value": "10240",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10250]",
-        "id": "edit-classements-10250",
-        "type": "checkbox",
-        "value": "10250",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10260]",
-        "id": "edit-classements-10260",
-        "type": "checkbox",
-        "value": "10260",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10270]",
-        "id": "edit-classements-10270",
-        "type": "checkbox",
-        "value": "10270",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "classements[10247]",
-        "id": "edit-classements-10247",
-        "type": "checkbox",
-        "value": "10247",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "page",
-        "id": "",
-        "type": "hidden",
-        "value": "0",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "sort",
-        "id": "edit-sort",
-        "type": "select-one",
-        "value": "_DIST_",
-        "visible": false,
-        "opts": 3
-      },
-      {
-        "name": "form_build_id",
-        "id": "",
-        "type": "hidden",
-        "value": "form-TaQr20CWQ0EROhfS35yFm_D1RDKJDB4xgbGF-NoheEQ",
-        "visible": false,
-        "opts": null
-      },
-      {
-        "name": "form_id",
-        "id": "",
-        "type": "hidden",
-        "value": "recherche_tournois_form",
-        "visible": false,
-        "opts": null
-      }
-    ],
-    "intercepted_ajax_params": null,
-    "intercepted_ajax_response_excerpt": null
+  "run_at": "2026-05-06T16:54:05Z",
+  "ligue_mapping": {
+    "50": "AUVERGNE RHONE-ALPES",
+    "51": "BOURGOGNE FRANCHE COMTE",
+    "52": "BRETAGNE",
+    "53": "CENTRE VAL DE LOIRE",
+    "54": "CORSE",
+    "55": "GRAND EST",
+    "63": "GUADELOUPE ST MARTIN ST BARTH",
+    "64": "GUYANE",
+    "56": "HAUTS DE FRANCE",
+    "57": "ILE DE FRANCE",
+    "65": "MARTINIQUE",
+    "58": "NORMANDIE",
+    "59": "NOUVELLE AQUITAINE",
+    "66": "NOUVELLE CALEDONIE",
+    "60": "OCCITANIE",
+    "61": "PAYS DE LA LOIRE",
+    "62": "PROVENCE ALPES COTE D'AZUR",
+    "67": "REUNION - MAYOTTE"
   },
-  "structured_ajax_tests": [
+  "tests": [
     {
-      "value": "ILE-DE-FRANCE",
-      "label": "ILE-DE-FRANCE",
-      "result": {
+      "ligue_id": "50",
+      "ligue_name": "AUVERGNE RHONE-ALPES",
+      "format": "cbrappel[]=XX",
+      "page_0": {
         "nb_results": 0,
+        "nb_items": 0,
         "commands": [
           "settings",
           "invoke",
           "insert",
           "insert"
         ],
-        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"iuUGLGbazZ_EkHAFEKPmkde7GO5yTziXizaXASoIWcE\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_",
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
         "http": 200
-      }
+      },
+      "pagination_ok": null
     },
     {
-      "value": "PROVENCE-ALPES-COTE",
-      "label": "PROVENCE-ALPES-COTE",
-      "result": {
+      "ligue_id": "51",
+      "ligue_name": "BOURGOGNE FRANCHE COMTE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
         "nb_results": 0,
+        "nb_items": 0,
         "commands": [
           "settings",
           "invoke",
           "insert",
           "insert"
         ],
-        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"iuUGLGbazZ_EkHAFEKPmkde7GO5yTziXizaXASoIWcE\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_",
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
         "http": 200
-      }
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "52",
+      "ligue_name": "BRETAGNE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "53",
+      "ligue_name": "CENTRE VAL DE LOIRE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "54",
+      "ligue_name": "CORSE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "55",
+      "ligue_name": "GRAND EST",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "63",
+      "ligue_name": "GUADELOUPE ST MARTIN ST BARTH",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "64",
+      "ligue_name": "GUYANE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "56",
+      "ligue_name": "HAUTS DE FRANCE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "57",
+      "ligue_name": "ILE DE FRANCE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "65",
+      "ligue_name": "MARTINIQUE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "58",
+      "ligue_name": "NORMANDIE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "59",
+      "ligue_name": "NOUVELLE AQUITAINE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "66",
+      "ligue_name": "NOUVELLE CALEDONIE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "60",
+      "ligue_name": "OCCITANIE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "61",
+      "ligue_name": "PAYS DE LA LOIRE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "62",
+      "ligue_name": "PROVENCE ALPES COTE D'AZUR",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "ligue_id": "67",
+      "ligue_name": "REUNION - MAYOTTE",
+      "format": "cbrappel[]=XX",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "pagination_ok": null
+    },
+    {
+      "format": "ligue=57 (IDF)",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "nb_results": 0
+    },
+    {
+      "format": "ligue=62 (PACA)",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "nb_results": 0
+    },
+    {
+      "format": "cbrappel=57 sans [] (IDF)",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "nb_results": 0
+    },
+    {
+      "format": "ligue[cbrappel][]=57 (IDF)",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "nb_results": 0
+    },
+    {
+      "format": "comite_ligue[]=57 (IDF)",
+      "page_0": {
+        "nb_results": 0,
+        "nb_items": 0,
+        "commands": [
+          "settings",
+          "invoke",
+          "insert",
+          "insert"
+        ],
+        "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"fqc94Tr0cnk-SBI1UwYeH_AgVAZdJ6EW9S4MC4DUfOY\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0",
+        "http": 200
+      },
+      "nb_results": 0
     }
   ],
-  "conclusion": "dropdown_items=0, intercepted=NON, ajax_working=0/2"
+  "working": [],
+  "conclusion": "working=0/18, all_ligues=0",
+  "all_ligues_test": {
+    "nb_results": 0
+  }
 }
