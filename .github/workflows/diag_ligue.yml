@@ -1,17 +1,16 @@
-name: "Padel Alert — Scraping France"
+name: "Padel Alert — Diagnostic ligue (one-shot)"
 
 on:
-  schedule:
-    - cron: "5 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  scrape:
+  diag:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,10 +20,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Installer les dependances
+      - name: Installer les dépendances
         run: |
           pip install -r backend/requirements_france.txt
           playwright install chromium --with-deps
 
-      - name: Scraper TenUp et ecrire tournaments.json (v6 — par ligue FFT)
-        run: python backend/scraper_france_v6.py
+      - name: Lancer diagnostic ligue
+        run: python backend/diag_ligue.py
