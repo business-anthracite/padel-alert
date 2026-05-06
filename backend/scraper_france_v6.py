@@ -1,21 +1,17 @@
 """
-Padel Alert — Scraper France v6 — par ligue FFT (cbrappel[])
-Architecture : Playwright session initiale → AJAX paginé par ligue.
+Padel Alert — Scraper France v6 — mode global (single_global)
 
-Paramètres clés découverts via diagnostics (06/05/2026) :
-- sort="dateDebut asc"  ← CRITIQUE (ancienne valeur "_DATE_" était invalide)
-- recherche_type="ligue" + cbrappel[]=ID  (IDs 50-67 découverts dans HTML)
-- Pas de ALL_CRITERIA (anciens codes invalides depuis redesign Ten'Up)
-- pratique="PADEL" suffit pour tous les tournois padel
-
-Mapping ligue → ID cbrappel :
-  50=ARA 51=BFC 52=BRE 53=CVL 54=COR 55=GE 56=HDF 57=IDF
-  58=NOR 59=NA  60=OCC 61=PDL 62=PACA 63=GUA 64=GUY 65=MAR 66=NC 67=REU
+Découverte diagnostics 06/05/2026 :
+- Ten'Up a redesigné son formulaire (anciens codes ALL_CRITERIA invalides)
+- sort="_DATE_" invalide → sort="dateDebut asc" requis
+- Le filtre cbrappel[]=ID (ligue) n'est PAS appliqué côté serveur :
+  IDF (57) et CORSE (54) retournent les mêmes 10 000 tournois (100% overlap)
+- Approche optimale : UNE SEULE série de pages, pratique=PADEL, sans filtre ligue
+- 10 000 / 30 = 333 pages × ~0.25s = ~5 minutes (vs 90 min avec 18 ligues)
 """
 import os, json, math, subprocess, time
 from datetime import datetime, timedelta
 import requests
-from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 OUTPUT_FILE  = "data/tournaments.json"
@@ -26,28 +22,6 @@ HORIZON_DAYS = 90
 RETRY_MAX    = 3
 
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
-
-# Mapping ligue → ID cbrappel (découvert dans HTML Ten'Up le 06/05/2026)
-LIGUES = [
-    ("50", "AUVERGNE RHONE-ALPES"),
-    ("51", "BOURGOGNE FRANCHE COMTE"),
-    ("52", "BRETAGNE"),
-    ("53", "CENTRE VAL DE LOIRE"),
-    ("54", "CORSE"),
-    ("55", "GRAND EST"),
-    ("63", "GUADELOUPE ST MARTIN ST BARTH"),
-    ("64", "GUYANE"),
-    ("56", "HAUTS DE FRANCE"),
-    ("57", "ILE DE FRANCE"),
-    ("65", "MARTINIQUE"),
-    ("58", "NORMANDIE"),
-    ("59", "NOUVELLE AQUITAINE"),
-    ("66", "NOUVELLE CALEDONIE"),
-    ("60", "OCCITANIE"),
-    ("61", "PAYS DE LA LOIRE"),
-    ("62", "PROVENCE ALPES COTE D'AZUR"),
-    ("67", "REUNION - MAYOTTE"),
-]
 
 
 # ── Session ────────────────────────────────────────────────────────────────────
@@ -88,15 +62,14 @@ def make_session(cookies):
 
 # ── AJAX ───────────────────────────────────────────────────────────────────────
 
-def ajax_page(session, fbid, ligue_id, date_start, date_end, page_num):
-    """Un appel AJAX ligue. Retourne (items, nb_total)."""
+def ajax_page(session, fbid, date_start, date_end, page_num):
+    """Appel AJAX global (pas de filtre ligue). Retourne (items, nb_total)."""
     data = {
-        "recherche_type": "ligue",
-        "cbrappel[]": ligue_id,
+        "recherche_type": "ligue",   # mode ligue = pool global padel
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        "sort": "dateDebut asc",          # ← valeur valide découverte le 06/05/2026
+        "sort": "dateDebut asc",     # valeur valide confirmée le 06/05/2026
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  "submit_main",
         "_triggering_element_value": "Rechercher",
@@ -111,56 +84,19 @@ def ajax_page(session, fbid, ligue_id, date_start, date_end, page_num):
                 if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
                     res = cmd.get("results", {})
                     return res.get("items", []), res.get("nb_results", 0)
-            # Commande absente → log les commandes reçues
             cmds = [c.get("command") for c in resp.json() if isinstance(c, dict)]
-            print(f"    WARN page {page_num} attempt {attempt}: commandes={cmds}")
+            print(f"  WARN page {page_num} attempt {attempt}: commandes={cmds} raw={resp.text[:200]}")
             return [], 0
         except Exception as e:
-            print(f"    Erreur page {page_num} attempt {attempt}: {e}")
+            print(f"  Erreur page {page_num} attempt {attempt}: {e}")
             if attempt < RETRY_MAX:
                 time.sleep(2 * attempt)
     return [], 0
 
 
-def scrape_ligue(session, fbid, ligue_id, ligue_name, date_start, date_end):
-    """Scrape toutes les pages d'une ligue. Retourne liste raw items."""
-    print(f"\n  ► {ligue_name} (id={ligue_id})")
-    all_items = {}
-
-    items0, nb_total = ajax_page(session, fbid, ligue_id, date_start, date_end, 0)
-    for it in items0:
-        all_items[str(it.get("id", ""))] = it
-
-    if nb_total == 0:
-        print(f"    0 résultats — ligue vide ou ID invalide")
-        return list(all_items.values()), 0
-
-    nb_pages = math.ceil(nb_total / 30)
-    print(f"    {nb_total} résultats annoncés → {nb_pages} pages")
-
-    empty_streak = 0
-    for page_num in range(1, nb_pages):
-        items, _ = ajax_page(session, fbid, ligue_id, date_start, date_end, page_num)
-        if not items:
-            empty_streak += 1
-            if empty_streak >= 3:
-                print(f"    3 pages vides consécutives — arrêt")
-                break
-            continue
-        empty_streak = 0
-        for it in items:
-            all_items[str(it.get("id", ""))] = it
-        if page_num % 25 == 0 or page_num == nb_pages - 1:
-            print(f"    page {page_num}/{nb_pages - 1} — {len(all_items)} collectés")
-        time.sleep(0.25)
-
-    print(f"    → {len(all_items)} uniques")
-    return list(all_items.values()), nb_total
-
-
 # ── Parsing ────────────────────────────────────────────────────────────────────
 
-def parse_item(item, ligue_name):
+def parse_item(item):
     tid = str(item.get("id", ""))
     if not tid:
         return None
@@ -175,7 +111,7 @@ def parse_item(item, ligue_name):
     date_debut_raw = item.get("dateDebut")
     date_debut     = date_debut_raw.get("date", "") if isinstance(date_debut_raw, dict) else ""
     date_fin_raw   = item.get("dateFin")
-    date_fin       = date_fin_raw.get("date", "")   if isinstance(date_fin_raw,  dict) else ""
+    date_fin       = date_fin_raw.get("date", "")   if isinstance(date_fin_raw, dict) else ""
 
     if date_debut:
         try:
@@ -217,7 +153,7 @@ def parse_item(item, ligue_name):
         "age_codes":        age_codes,
         "niveau_codes":     niveau_codes,
         "competition_codes":competition_codes,
-        "ligues":           [ligue_name],
+        "ligues":           [],
         "link":             f"{TENUP_BASE}/tournoi/{tid}",
     }
 
@@ -228,36 +164,48 @@ def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
     date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v6 — {len(LIGUES)} ligues ({date_start}→{date_end})")
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v6 global ({date_start}→{date_end})")
 
     fbid, cookies = get_session()
     session = make_session(cookies)
 
-    all_tournaments = {}
-    stats = {}
+    all_items = {}
 
-    for ligue_id, ligue_name in LIGUES:
-        raw_items, nb_total = scrape_ligue(session, fbid, ligue_id, ligue_name, date_start, date_end)
-        stats[ligue_name] = {"id": ligue_id, "nb_total_tenup": nb_total, "scraped": len(raw_items)}
+    # Page 0 : découvrir nb_total
+    items0, nb_total = ajax_page(session, fbid, date_start, date_end, 0)
+    for it in items0:
+        all_items[str(it.get("id", ""))] = it
 
-        for item in raw_items:
-            parsed = parse_item(item, ligue_name)
-            if not parsed:
-                continue
-            tid = parsed["tenup_id"]
-            if tid in all_tournaments:
-                if ligue_name not in all_tournaments[tid]["ligues"]:
-                    all_tournaments[tid]["ligues"].append(ligue_name)
-            else:
-                all_tournaments[tid] = parsed
+    if nb_total == 0:
+        print("ERREUR : 0 résultats page 0 — vérifier les paramètres AJAX")
+        raise SystemExit(1)
 
-    tournaments = list(all_tournaments.values())
+    nb_pages = math.ceil(nb_total / 30)
+    print(f"{nb_total} tournois annoncés → {nb_pages} pages à scraper")
+
+    empty_streak = 0
+    for page_num in range(1, nb_pages):
+        items, _ = ajax_page(session, fbid, date_start, date_end, page_num)
+        if not items:
+            empty_streak += 1
+            if empty_streak >= 3:
+                print(f"  3 pages vides consécutives à la page {page_num} — arrêt")
+                break
+            continue
+        empty_streak = 0
+        for it in items:
+            all_items[str(it.get("id", ""))] = it
+        if page_num % 50 == 0:
+            elapsed = (datetime.now() - now).total_seconds()
+            print(f"  Page {page_num}/{nb_pages - 1} — {len(all_items)} collectés ({elapsed:.0f}s)")
+        time.sleep(0.2)
+
+    tournaments = [t for item in all_items.values() if (t := parse_item(item))]
+    elapsed_total = (datetime.now() - now).total_seconds()
 
     print(f"\n{'='*60}")
-    print(f"Total France : {len(tournaments)} tournois uniques")
-    print("\nDétail par ligue :")
-    for name, s in stats.items():
-        print(f"  {name}: {s['nb_total_tenup']} annoncés → {s['scraped']} scrapés")
+    print(f"Total : {len(tournaments)} tournois uniques en {elapsed_total:.0f}s")
+    print(f"(nb_total annoncé Ten'Up : {nb_total})")
 
     # Écrire JSON
     os.makedirs("data", exist_ok=True)
@@ -265,13 +213,12 @@ def main():
         "scraped_at":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
         "count":       len(tournaments),
         "tournaments": tournaments,
-        "stats":       stats,
     }
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"\nFichier écrit : {OUTPUT_FILE}")
+    print(f"Fichier écrit : {OUTPUT_FILE}")
 
-    # Git commit + push
+    # Git
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
     subprocess.run(["git", "add", OUTPUT_FILE], check=True)
