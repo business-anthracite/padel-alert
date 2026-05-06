@@ -1,49 +1,87 @@
 {
-  "run_at": "2026-05-06T22:07:31Z",
-  "tests": [
+  "run_at": "2026-05-06T22:15:24Z",
+  "pagination_tests": [
     {
-      "label": "sans critères",
-      "nb_results": 10000,
-      "nb_items": 30,
-      "first_id": "82554319",
-      "http": 200
+      "page": 0,
+      "nb_results": 0,
+      "nb_items": 0,
+      "new_unique": 0,
+      "overlap_with_prev": 0,
+      "ids": []
     },
     {
-      "label": "nouveaux critères complets",
+      "page": 1,
       "nb_results": 1147,
       "nb_items": 30,
-      "first_id": "174981",
-      "http": 200
+      "new_unique": 30,
+      "overlap_with_prev": 0,
+      "ids": [
+        "174981",
+        "177570",
+        "174294",
+        "176944",
+        "173417"
+      ]
     },
     {
-      "label": "famille_tournois uniquement",
-      "nb_results": 10000,
-      "nb_items": 30,
-      "first_id": "82554319",
-      "http": 200
-    },
-    {
-      "label": "epreuve DM+DD+DX uniquement",
-      "nb_results": 10000,
-      "nb_items": 30,
-      "first_id": "82554319",
-      "http": 200
-    },
-    {
-      "label": "page 1 critères complets",
-      "pagination_ok": false,
+      "page": 2,
       "nb_results": 1147,
       "nb_items": 30,
-      "first_id": "174981",
-      "http": 200
+      "new_unique": 0,
+      "overlap_with_prev": 30,
+      "ids": [
+        "174981",
+        "177570",
+        "174294",
+        "176944",
+        "173417"
+      ]
     },
     {
-      "label": "ville Paris + nouveaux critères",
-      "nb_results": 99,
+      "page": 3,
+      "nb_results": 1147,
       "nb_items": 30,
-      "first_id": "190391",
-      "http": 200
+      "new_unique": 0,
+      "overlap_with_prev": 30,
+      "ids": [
+        "174981",
+        "177570",
+        "174294",
+        "176944",
+        "173417"
+      ]
+    },
+    {
+      "page": 4,
+      "nb_results": 1147,
+      "nb_items": 30,
+      "new_unique": 0,
+      "overlap_with_prev": 30,
+      "ids": [
+        "174981",
+        "177570",
+        "174294",
+        "176944",
+        "173417"
+      ]
+    },
+    {
+      "page": 5,
+      "nb_results": 1147,
+      "nb_items": 30,
+      "new_unique": 0,
+      "overlap_with_prev": 30,
+      "ids": [
+        "174981",
+        "177570",
+        "174294",
+        "176944",
+        "173417"
+      ]
     }
   ],
-  "conclusion": "max_nb=10000"
+  "scrape_test": {},
+  "unique_after_6_pages": 30,
+  "pagination_works": false,
+  "date_180_nb": 1254
 }
