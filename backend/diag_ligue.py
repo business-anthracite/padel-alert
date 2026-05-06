@@ -1,9 +1,11 @@
 """
-Padel Alert — Diagnostic ligue v6
-Tourne UNE seule fois (workflow_dispatch) pour :
-1. Découvrir les codes ligue dans le dropdown Ten'Up
-2. Tester page 0 et page 1 pour chaque ligue cible
-3. Confirmer que la pagination par ligue individuelle fonctionne
+Padel Alert — Diagnostic ligue v2
+Améliorations v2 :
+- wait_for_load_state("networkidle") après click radio (+ wait_for_selector)
+- Capture de TOUS les éléments avec "ligue" dans leurs attributs (select + custom listbox)
+- Interception réseau pour capturer les requêtes AJAX faites lors du click radio
+- Dump HTML complet après click (50 000 chars)
+- Tests AJAX avec codes devinés (IDF, PACA, ...) si select non trouvé
 Résultat commité dans data/diag_ligue.json
 """
 import json, re, math, time, subprocess, os
@@ -17,24 +19,12 @@ TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
 
 TARGET_LIGUE_NAMES = [
-    "AUVERGNE RHONE-ALPES",
-    "BOURGOGNE FRANCHE COMTE",
-    "BRETAGNE",
-    "CENTRE VAL DE LOIRE",
-    "CORSE",
-    "GRAND EST",
-    "GUADELOUPE ST MARTIN ST BARTH",
-    "GUYANE",
-    "HAUTS DE FRANCE",
-    "ILE DE FRANCE",
-    "MARTINIQUE",
-    "NORMANDIE",
-    "NOUVELLE AQUITAINE",
-    "NOUVELLE CALEDONIE",
-    "OCCITANIE",
-    "PAYS DE LA LOIRE",
-    "PROVENCE ALPES COTE D'AZUR",
-    "REUNION - MAYOTTE",
+    "AUVERGNE RHONE-ALPES", "BOURGOGNE FRANCHE COMTE", "BRETAGNE",
+    "CENTRE VAL DE LOIRE", "CORSE", "GRAND EST",
+    "GUADELOUPE ST MARTIN ST BARTH", "GUYANE", "HAUTS DE FRANCE",
+    "ILE DE FRANCE", "MARTINIQUE", "NORMANDIE", "NOUVELLE AQUITAINE",
+    "NOUVELLE CALEDONIE", "OCCITANIE", "PAYS DE LA LOIRE",
+    "PROVENCE ALPES COTE D'AZUR", "REUNION - MAYOTTE",
 ]
 
 ALL_CRITERIA = {
@@ -50,7 +40,6 @@ ALL_CRITERIA = {
     "categorie_tournoi[P1500]": "P1500", "categorie_tournoi[P2000]": "P2000",
 }
 
-
 def normalize(s):
     import unicodedata
     s = unicodedata.normalize("NFD", s)
@@ -59,19 +48,22 @@ def normalize(s):
 
 
 def discover_form_and_ligues():
-    """Ouvre Ten'Up avec Playwright, découvre la structure du formulaire et les codes ligue."""
     result = {
-        "form_fields": [],
+        "ajax_requests_on_radio_click": [],
+        "ajax_responses_on_radio_click": [],
+        "ligue_elements_found": [],
         "ligue_select_name": None,
         "ligue_options": [],
-        "comite_select_name": None,
-        "comite_options_sample": [],
+        "comite_elements_found": [],
         "fbid": None,
-        "cookies": {},
-        "html_selects": [],
-        "html_inputs_recherche_type": [],
-        "all_input_names": [],
+        "html_after_ligue_radio_click": "",
+        "html_selects_after_click": [],
+        "intercepted_submit_request": None,
+        "intercepted_submit_response_excerpt": None,
     }
+
+    ajax_reqs  = []
+    ajax_resps = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -80,153 +72,202 @@ def discover_form_and_ligues():
             locale="fr-FR",
         )
         page = ctx.new_page()
+
+        # ── Interception réseau ───────────────────────────────────────────────
+        def on_request(req):
+            if "/system/ajax" in req.url and req.method == "POST":
+                ajax_reqs.append({
+                    "url": req.url,
+                    "post_data": req.post_data or "",
+                    "timing": datetime.utcnow().isoformat(),
+                })
+        def on_response(resp):
+            if "/system/ajax" in resp.url:
+                try:
+                    body = resp.text()
+                    ajax_resps.append({
+                        "url": resp.url,
+                        "status": resp.status,
+                        "body_excerpt": body[:2000],
+                        "timing": datetime.utcnow().isoformat(),
+                    })
+                except:
+                    pass
+        page.on("request", on_request)
+        page.on("response", on_response)
+
+        # ── Chargement initial ────────────────────────────────────────────────
         print("  Ouverture Ten'Up...")
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(7000)
 
-        fbid = page.evaluate("() => document.querySelector('input[name=\"form_build_id\"]')?.value")
-        result["fbid"] = fbid
-        result["cookies"] = {c["name"]: c["value"] for c in ctx.cookies()}
+        fbid    = page.evaluate("() => document.querySelector('input[name=\"form_build_id\"]')?.value")
+        cookies = {c["name"]: c["value"] for c in ctx.cookies()}
+        result["fbid"]    = fbid
+        result["cookies"] = cookies
+        print(f"  fbid initial: {fbid[:30] if fbid else 'MANQUANT'}")
 
-        # Dump tous les inputs de la page initiale
-        all_fields = page.evaluate("""
-            () => Array.from(document.querySelectorAll('input, select, textarea')).map(el => ({
-                tag: el.tagName.toLowerCase(),
-                name: el.name || '',
-                id: el.id || '',
-                type: el.type || '',
-                value: el.value || '',
-                visible: el.offsetParent !== null,
-                options: el.tagName === 'SELECT'
-                    ? Array.from(el.options).map(o => ({v: o.value, t: o.text.trim()}))
-                    : null
+        # ── Click radio "ligue" ───────────────────────────────────────────────
+        radio_ligue = page.query_selector('#edit-recherche-type-ligue, [name="recherche_type"][value="ligue"]')
+        if radio_ligue:
+            print("  Click radio recherche_type=ligue...")
+            radio_ligue.click()
+            # Attendre la fin de toutes les requêtes réseau
+            try:
+                page.wait_for_load_state("networkidle", timeout=10000)
+            except:
+                page.wait_for_timeout(5000)
+            print(f"  Réseau idle — {len(ajax_reqs)} req AJAX interceptées")
+        else:
+            print("  WARN: radio ligue non trouvé")
+
+        result["ajax_requests_on_radio_click"]  = ajax_reqs.copy()
+        result["ajax_responses_on_radio_click"] = ajax_resps.copy()
+
+        # ── Dump HTML complet après click ─────────────────────────────────────
+        html_after = page.content()
+        result["html_after_ligue_radio_click"] = html_after[:50000]
+
+        # ── Chercher select ligue (standard ou caché) ─────────────────────────
+        selects_after = page.evaluate("""
+            () => Array.from(document.querySelectorAll('select')).map(s => ({
+                name: s.name, id: s.id, visible: s.offsetParent !== null,
+                class: s.className,
+                options: Array.from(s.options).map(o => ({v: o.value, t: o.text.trim()}))
             }))
         """)
-        result["all_input_names"] = [f["name"] for f in all_fields if f["name"]]
-        result["html_selects"] = [f for f in all_fields if f["tag"] == "select"]
-        result["html_inputs_recherche_type"] = [f for f in all_fields if "recherche" in f["name"].lower()]
+        result["html_selects_after_click"] = selects_after
+        print(f"  {len(selects_after)} select(s) trouvés après click")
+        for s in selects_after:
+            print(f"    name='{s['name']}' id='{s['id']}' visible={s['visible']} opts={len(s['options'])}")
+            if "ligue" in (s["name"] + s["id"]).lower() and s["options"]:
+                result["ligue_select_name"] = s["name"]
+                result["ligue_options"]     = s["options"]
 
-        # Chercher select ligue dans l'état initial
-        for f in all_fields:
-            if f["tag"] == "select" and "ligue" in (f["name"] + f["id"]).lower():
-                result["ligue_select_name"] = f["name"]
-                result["ligue_options"] = f["options"] or []
-                print(f"  Select ligue trouvé (initial) : name='{f['name']}', {len(result['ligue_options'])} options")
-                break
-
-        # Essayer de cliquer le radio "ligue" pour révéler les options
-        ligue_radio_clicked = False
-        for f in all_fields:
-            if f["tag"] == "input" and f["type"] == "radio" and "ligue" in (f["value"] + f["name"] + f["id"]).lower():
-                try:
-                    sel = f'[name="{f["name"]}"][value="{f["value"]}"]'
-                    page.click(sel, timeout=3000)
-                    page.wait_for_timeout(2500)
-                    ligue_radio_clicked = True
-                    print(f"  Cliqué radio name='{f['name']}' value='{f['value']}'")
-                    break
-                except Exception as e:
-                    print(f"  Impossible de cliquer radio '{f['name']}'='{f['value']}': {e}")
-
-        if not ligue_radio_clicked:
-            # Essayer par texte
-            for txt in ["Ligue", "Par ligue", "ligue"]:
-                try:
-                    page.click(f'text="{txt}"', timeout=2000)
-                    page.wait_for_timeout(2500)
-                    ligue_radio_clicked = True
-                    print(f"  Cliqué '{txt}' par texte")
-                    break
-                except:
-                    pass
-
-        # Re-dump après click radio
-        all_fields_after = page.evaluate("""
-            () => Array.from(document.querySelectorAll('input, select, textarea')).map(el => ({
-                tag: el.tagName.toLowerCase(),
-                name: el.name || '',
-                id: el.id || '',
-                type: el.type || '',
-                value: el.value || '',
-                visible: el.offsetParent !== null,
-                options: el.tagName === 'SELECT'
-                    ? Array.from(el.options).map(o => ({v: o.value, t: o.text.trim()}))
-                    : null
-            }))
-        """)
-
-        for f in all_fields_after:
-            if f["tag"] == "select" and "ligue" in (f["name"] + f["id"]).lower() and not result["ligue_options"]:
-                result["ligue_select_name"] = f["name"]
-                result["ligue_options"] = f["options"] or []
-                print(f"  Select ligue trouvé (après radio) : name='{f['name']}', {len(result['ligue_options'])} options")
-                break
-
-        # Si on a les options ligue, sélectionner ILE DE FRANCE pour voir les comités
-        if result["ligue_options"]:
-            ile_de_france_opt = next(
-                (o for o in result["ligue_options"] if "ILE DE FRANCE" in normalize(o.get("t", "")) or "IDF" == o.get("v", "").upper()),
-                None
-            )
-            if not ile_de_france_opt and result["ligue_options"]:
-                ile_de_france_opt = result["ligue_options"][1] if len(result["ligue_options"]) > 1 else result["ligue_options"][0]
-
-            if ile_de_france_opt and result["ligue_select_name"]:
-                try:
-                    page.select_option(f'select[name="{result["ligue_select_name"]}"]', value=ile_de_france_opt["v"])
-                    page.wait_for_timeout(3000)
-                    print(f"  Sélectionné ligue : {ile_de_france_opt['t']} (v={ile_de_france_opt['v']})")
-
-                    # Dump comités apparus
-                    comite_fields = page.evaluate("""
-                        () => Array.from(document.querySelectorAll('input, select')).map(el => ({
-                            tag: el.tagName.toLowerCase(),
-                            name: el.name || '',
-                            id: el.id || '',
-                            type: el.type || '',
-                            value: el.value || '',
+        # ── Chercher TOUS les éléments contenant "ligue" ──────────────────────
+        ligue_els = page.evaluate("""
+            () => {
+                const res = [];
+                document.querySelectorAll('*').forEach(el => {
+                    const name    = el.getAttribute('name')  || '';
+                    const id      = el.getAttribute('id')    || '';
+                    const cls     = el.getAttribute('class') || '';
+                    const dataRef = el.getAttribute('data-refer') || '';
+                    if ((name+id+cls+dataRef).toLowerCase().includes('ligue')) {
+                        res.push({
+                            tag:     el.tagName,
+                            name:    name,
+                            id:      id,
+                            class:   cls.substring(0,80),
+                            value:   el.tagName === 'SELECT' ? el.value : (el.getAttribute('value') || dataRef),
                             visible: el.offsetParent !== null,
+                            text:    (el.textContent || '').trim().substring(0, 100),
                             options: el.tagName === 'SELECT'
                                 ? Array.from(el.options).map(o => ({v: o.value, t: o.text.trim()}))
-                                : null
-                        }))
-                    """)
-                    for f2 in comite_fields:
-                        if "comite" in (f2["name"] + f2["id"]).lower() and f2["tag"] == "select":
-                            result["comite_select_name"] = f2["name"]
-                            result["comite_options_sample"] = (f2["options"] or [])[:20]
-                            print(f"  Select comité : name='{f2['name']}', {len(f2['options'] or [])} options")
-                            break
-                        if "comite" in (f2["name"] + f2["id"]).lower() and f2["tag"] == "input":
-                            result["comite_options_sample"].append({"tag": "input", "name": f2["name"], "value": f2["value"], "type": f2["type"]})
-                except Exception as e:
-                    print(f"  Erreur sélection ligue IDF: {e}")
-
-        # Dump full form HTML pour inspection
-        form_html = page.evaluate("""
-            () => {
-                const form = document.querySelector('form');
-                return form ? form.outerHTML.substring(0, 8000) : 'form not found';
+                                : null,
+                        });
+                    }
+                });
+                return res.slice(0, 50);
             }
         """)
-        result["form_html_excerpt"] = form_html
+        result["ligue_elements_found"] = ligue_els
+        print(f"  {len(ligue_els)} élément(s) avec 'ligue' dans leurs attributs:")
+        for el in ligue_els:
+            print(f"    <{el['tag']}> name='{el['name']}' id='{el['id']}' visible={el['visible']} opts={len(el['options'] or [])} text='{el['text'][:60]}'")
 
-        # Dump all select/input field names pour debug
-        result["form_fields"] = [
-            {"name": f["name"], "id": f["id"], "type": f["type"], "tag": f["tag"], "visible": f["visible"]}
-            for f in all_fields_after if f["name"]
-        ]
+        # ── Chercher custom listbox (role="listbox" / role="option") ──────────
+        listboxes = page.evaluate("""
+            () => {
+                const uls = document.querySelectorAll('[role="listbox"]');
+                return Array.from(uls).map(ul => ({
+                    id: ul.id, class: (ul.getAttribute('class')||'').substring(0,80),
+                    items: Array.from(ul.querySelectorAll('[role="option"], li')).map(li => ({
+                        dataRefer: li.getAttribute('data-refer') || '',
+                        text: (li.textContent || '').trim().substring(0,60),
+                        id: li.id || '',
+                    }))
+                }));
+            }
+        """)
+        result["custom_listboxes"] = listboxes
+        print(f"  {len(listboxes)} custom listbox(es) trouvé(s):")
+        for lb in listboxes:
+            items_preview = [f"{i['dataRefer']}={i['text'][:20]}" for i in lb['items'][:5]]
+            print(f"    id='{lb['id']}' items={len(lb['items'])} preview={items_preview}")
+
+        # ── Si options ligue trouvées : sélectionner IDF, chercher comités ────
+        if result["ligue_options"]:
+            idf_opt = next((o for o in result["ligue_options"] if "ILE" in normalize(o.get("t","")) or "IDF" == o.get("v","").upper()), None)
+            if not idf_opt:
+                idf_opt = result["ligue_options"][1] if len(result["ligue_options"]) > 1 else None
+            if idf_opt and result["ligue_select_name"]:
+                print(f"  Sélection ligue '{idf_opt['t']}' (v={idf_opt['v']}) pour détecter comités...")
+                ajax_reqs.clear(); ajax_resps.clear()
+                page.select_option(f'select[name="{result["ligue_select_name"]}"]', value=idf_opt["v"])
+                try:
+                    page.wait_for_load_state("networkidle", timeout=8000)
+                except:
+                    page.wait_for_timeout(3000)
+                # Chercher éléments comité
+                comite_els = page.evaluate("""
+                    () => {
+                        const res = [];
+                        document.querySelectorAll('*').forEach(el => {
+                            const name = el.getAttribute('name') || '';
+                            const id   = el.getAttribute('id')   || '';
+                            if ((name+id).toLowerCase().includes('comite') || (name+id).toLowerCase().includes('comité')) {
+                                res.push({
+                                    tag: el.tagName, name, id,
+                                    value: el.tagName === 'SELECT' ? el.value : (el.getAttribute('value') || ''),
+                                    visible: el.offsetParent !== null,
+                                    options: el.tagName === 'SELECT'
+                                        ? Array.from(el.options).map(o => ({v: o.value, t: o.text.trim()}))
+                                        : null,
+                                });
+                            }
+                        });
+                        return res.slice(0, 30);
+                    }
+                """)
+                result["comite_elements_found"]         = comite_els
+                result["ajax_reqs_after_ligue_select"]  = ajax_reqs.copy()
+                result["ajax_resps_after_ligue_select"] = [r for r in ajax_resps]
+                print(f"  Comité elements: {len(comite_els)}, AJAX reqs: {len(ajax_reqs)}")
+
+                # ── Essai soumission formulaire (intercepter la requête AJAX) ──
+                print("  Soumission du formulaire pour intercepter les paramètres...")
+                ajax_reqs.clear(); ajax_resps.clear()
+                now = datetime.now()
+                ds  = now.strftime("%d/%m/%y")
+                de  = (now + timedelta(days=90)).strftime("%d/%m/%y")
+                # Remplir dates
+                for fname, val in [("date[start]", ds), ("date[end]", de)]:
+                    el = page.query_selector(f'input[name="{fname}"]')
+                    if el:
+                        el.evaluate("(el, v) => { el.value = v; }", val)
+                # Cliquer Rechercher
+                submit = page.query_selector('[name="submit_main"], input[value="Rechercher"]')
+                if submit:
+                    submit.click()
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=15000)
+                    except:
+                        page.wait_for_timeout(5000)
+                    result["intercepted_submit_request"] = ajax_reqs[-1] if ajax_reqs else None
+                    result["intercepted_submit_response_excerpt"] = ajax_resps[-1]["body_excerpt"] if ajax_resps else None
+                    print(f"  Submit: {len(ajax_reqs)} req capturée(s)")
 
         browser.close()
 
+    result.pop("cookies", None)  # Ne pas commiter les cookies
     return result
 
 
 def test_ajax_ligue(cookies, fbid, ligue_code, ligue_name):
-    """Teste pages 0 et 1 pour un code ligue donné. Retourne dict avec résultats."""
     now = datetime.now()
-    date_start = now.strftime("%d/%m/%y")
-    date_end   = (now + timedelta(days=90)).strftime("%d/%m/%y")
+    ds  = now.strftime("%d/%m/%y")
+    de  = (now + timedelta(days=90)).strftime("%d/%m/%y")
 
     s = requests.Session()
     s.headers.update({
@@ -241,65 +282,58 @@ def test_ajax_ligue(cookies, fbid, ligue_code, ligue_name):
     for k, v in cookies.items():
         s.cookies.set(k, v)
 
-    base_params = {
-        "recherche_type": "ligue",
-        "ligue": ligue_code,
-        "pratique": "PADEL",
-        "date[start]": date_start,
-        "date[end]": date_end,
-        **ALL_CRITERIA,
-        "sort": "_DATE_",
-        "form_id": "recherche_tournois_form",
-        "_triggering_element_name": "submit_main",
-        "_triggering_element_value": "Rechercher",
-        "form_build_id": fbid,
-    }
-
-    def do_request(page_num):
-        params = {**base_params, "page": str(page_num)}
+    def do_req(page_num, extra_params=None):
+        params = {
+            "recherche_type": "ligue",
+            "ligue": ligue_code,
+            "pratique": "PADEL",
+            "date[start]": ds, "date[end]": de,
+            **ALL_CRITERIA,
+            "sort": "_DATE_",
+            "form_id": "recherche_tournois_form",
+            "_triggering_element_name": "submit_main",
+            "_triggering_element_value": "Rechercher",
+            "form_build_id": fbid,
+            "page": str(page_num),
+        }
+        if extra_params:
+            params.update(extra_params)
         try:
-            resp = s.post(TENUP_AJAX, data=params, timeout=45)
-            resp.raise_for_status()
-            raw_cmds = resp.json()
-            for cmd in raw_cmds:
+            r = s.post(TENUP_AJAX, data=params, timeout=45)
+            r.raise_for_status()
+            cmds = r.json()
+            for cmd in cmds:
                 if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
                     res = cmd.get("results", {})
                     return {
-                        "http_status": resp.status_code,
+                        "http": r.status_code,
                         "nb_results": res.get("nb_results", 0),
                         "nb_items": len(res.get("items", [])),
-                        "first_item_id": res.get("items", [{}])[0].get("id") if res.get("items") else None,
-                        "commands": [c.get("command") for c in raw_cmds if isinstance(c, dict)],
+                        "first_id": (res.get("items") or [{}])[0].get("id"),
+                        "commands": [c.get("command") for c in cmds if isinstance(c, dict)],
                     }
-            return {
-                "http_status": resp.status_code,
-                "nb_results": 0,
-                "nb_items": 0,
-                "commands": [c.get("command") for c in raw_cmds if isinstance(c, dict)],
-                "raw_excerpt": resp.text[:500],
-            }
+            return {"http": r.status_code, "nb_results": 0, "nb_items": 0,
+                    "commands": [c.get("command") for c in cmds if isinstance(c, dict)],
+                    "raw": r.text[:300]}
         except Exception as e:
             return {"error": str(e)}
 
-    result = {"ligue_name": ligue_name, "ligue_code": ligue_code}
-    print(f"  Test AJAX ligue='{ligue_code}' ({ligue_name})...")
-    result["page_0"] = do_request(0)
-    print(f"    page_0: {result['page_0']}")
+    print(f"  AJAX test code='{ligue_code}' ({ligue_name})...")
+    r = {"ligue_name": ligue_name, "ligue_code": ligue_code}
+    r["page_0"] = do_req(0)
+    print(f"    page_0: {r['page_0']}")
 
-    nb_total = result["page_0"].get("nb_results", 0)
-    if nb_total > 30:
+    nb = r["page_0"].get("nb_results", 0)
+    if nb > 30:
         time.sleep(0.5)
-        result["page_1"] = do_request(1)
-        print(f"    page_1: {result['page_1']}")
-        # Vérifier que page_1 a des items DIFFÉRENTS de page_0
-        if result["page_0"].get("first_item_id") and result["page_1"].get("first_item_id"):
-            result["pagination_ok"] = (result["page_0"]["first_item_id"] != result["page_1"]["first_item_id"])
-        else:
-            result["pagination_ok"] = None
-    else:
-        result["pagination_ok"] = None
-
-    return result
+        r["page_1"] = do_req(1)
+        print(f"    page_1: {r['page_1']}")
+        r["pagination_ok"] = (
+            r["page_0"].get("first_id") is not None and
+            r["page_1"].get("first_id") is not None and
+            r["page_0"]["first_id"] != r["page_1"]["first_id"]
+        )
+    return r
 
 
 def main():
@@ -308,89 +342,83 @@ def main():
         "discovery": {},
         "ligue_tests": [],
         "matched_ligues": [],
-        "recommendations": [],
     }
 
     print("=== PHASE 1 : Découverte formulaire ===")
     disc = discover_form_and_ligues()
-    output["discovery"] = {
-        k: v for k, v in disc.items()
-        if k not in ("cookies",)  # ne pas sauvegarder les cookies
-    }
-    fbid    = disc["fbid"]
-    cookies = disc["cookies"]
-    ligue_options = disc["ligue_options"]
+    output["discovery"] = disc
+    fbid    = disc.get("fbid")
+    cookies = disc.get("cookies", {})
+    ligue_options = disc.get("ligue_options", [])
 
-    print(f"\nform_build_id: {fbid}")
-    print(f"Ligues trouvées ({len(ligue_options)}) :")
+    print(f"\nfbid: {fbid}")
+    print(f"Ligues trouvées dans select : {len(ligue_options)}")
     for o in ligue_options:
-        print(f"  value='{o.get('v','')}' text='{o.get('t','')}'")
+        print(f"  v='{o.get('v','')}' t='{o.get('t','')}'")
 
-    print("\n=== PHASE 2 : Matching ligues cibles ===")
+    print("\n=== PHASE 2 : Tests AJAX avec codes connus/devinés ===")
+    # Combiner : options découvertes + codes FFT classiques à tester
+    codes_to_test = []
+    if ligue_options:
+        # Extraire codes depuis les options découvertes
+        idf_code  = next((o["v"] for o in ligue_options if "ILE" in normalize(o.get("t",""))), None)
+        paca_code = next((o["v"] for o in ligue_options if "PROVENCE" in normalize(o.get("t","")) or "PACA" in normalize(o.get("t",""))), None)
+        bre_code  = next((o["v"] for o in ligue_options if normalize(o.get("t","")) == "BRETAGNE"), None)
+        if idf_code:  codes_to_test.append((idf_code,  "ILE DE FRANCE (découvert)"))
+        if paca_code: codes_to_test.append((paca_code, "PACA (découvert)"))
+        if bre_code:  codes_to_test.append((bre_code,  "BRETAGNE (découvert)"))
+    else:
+        # Aucun select trouvé — tester des codes FFT classiques
+        codes_to_test = [
+            ("IDF",  "ILE DE FRANCE (guess IDF)"),
+            ("PACA", "PACA (guess PACA)"),
+            ("ARA",  "AUVERGNE RHONE ALPES (guess ARA)"),
+            ("OCC",  "OCCITANIE (guess OCC)"),
+            ("NA",   "NOUVELLE AQUITAINE (guess NA)"),
+            ("HDF",  "HAUTS DE FRANCE (guess HDF)"),
+            ("GE",   "GRAND EST (guess GE)"),
+            ("BRE",  "BRETAGNE (guess BRE)"),
+            ("ALL",  "Toutes ligues (ligue=ALL)"),
+            ("",     "Vide (ligue=vide)"),
+        ]
+
+    for code, name in codes_to_test[:8]:  # Max 8 tests
+        t = test_ajax_ligue(cookies, fbid, code, name)
+        output["ligue_tests"].append(t)
+        time.sleep(0.5)
+
+    # Matching
+    print("\n=== PHASE 3 : Matching ligues cibles ===")
     matched = []
+    norms = [(o, normalize(o.get("t", ""))) for o in ligue_options]
     for target in TARGET_LIGUE_NAMES:
-        norm_t = normalize(target)
-        found  = next((o for o in ligue_options if normalize(o.get("t", "")) == norm_t), None)
-        if not found:
-            found = next((o for o in ligue_options if norm_t in normalize(o.get("t", "")) or normalize(o.get("t", "")) in norm_t), None)
-        if found:
-            matched.append({"target": target, "code": found["v"], "label": found["t"]})
-            print(f"  ✓ {target} → {found['t']} (code={found['v']})")
-        else:
-            matched.append({"target": target, "code": None, "label": None})
-            print(f"  ✗ {target} → NON TROUVÉ")
+        nt = normalize(target)
+        found = next((o for o, n in norms if n == nt), None) or \
+                next((o for o, n in norms if nt in n or (n and n in nt)), None)
+        matched.append({"target": target, "code": found["v"] if found else None, "label": found["t"] if found else None})
+        status = "✓" if found else "✗"
+        print(f"  {status} {target} → {found['t'] if found else 'NON TROUVÉ'}")
     output["matched_ligues"] = matched
 
-    print("\n=== PHASE 3 : Tests AJAX paginés ===")
-    # Tester 3 ligues : ILE DE FRANCE (dense), PACA (dense), BRETAGNE (moyen)
-    test_targets = [
-        m for m in matched
-        if m["code"] and m["target"] in ("ILE DE FRANCE", "PROVENCE ALPES COTE D'AZUR", "BRETAGNE")
-    ]
-    if not test_targets and matched:
-        # Fallback : tester les 3 premières ligues trouvées
-        test_targets = [m for m in matched if m["code"]][:3]
-
-    for m in test_targets:
-        test_res = test_ajax_ligue(cookies, fbid, m["code"], m["target"])
-        output["ligue_tests"].append(test_res)
-        time.sleep(1)
-
-    # Test avec ligue=ALL pour comparaison (connu comme étant limité)
-    print("\n  Test ligue=ALL (comparaison)...")
-    all_test = test_ajax_ligue(cookies, fbid, "ALL", "ALL_LIGUES")
-    output["ligue_all_test"] = all_test
-
-    # Recommandations
+    # Résumé
     working = [t for t in output["ligue_tests"] if t.get("page_0", {}).get("nb_results", 0) > 0]
-    pagination_ok = [t for t in working if t.get("pagination_ok") is True]
-
-    output["recommendations"] = {
-        "ligues_with_results": len(working),
-        "ligues_pagination_ok": len(pagination_ok),
-        "total_matched": len([m for m in matched if m["code"]]),
-        "total_unmatched": len([m for m in matched if not m["code"]]),
-    }
-
     print(f"\n=== RÉSUMÉ ===")
-    print(f"Ligues trouvées dans Ten'Up : {len(ligue_options)}")
-    print(f"Ligues cibles matchées : {output['recommendations']['total_matched']}/{len(TARGET_LIGUE_NAMES)}")
-    print(f"Tests avec résultats : {output['recommendations']['ligues_with_results']}/{len(test_targets)}")
-    print(f"Pagination fonctionne : {output['recommendations']['ligues_pagination_ok']}/{len(working)}")
+    print(f"Ligues dans select : {len(ligue_options)}")
+    print(f"AJAX tests avec résultats : {len(working)}/{len(output['ligue_tests'])}")
+    for t in working:
+        print(f"  code='{t['ligue_code']}' → {t['page_0']['nb_results']} résultats, pagination_ok={t.get('pagination_ok','N/A')}")
 
-    # Écrire les résultats
     os.makedirs("data", exist_ok=True)
     with open("data/diag_ligue.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
-    print("\nRésultats sauvegardés dans data/diag_ligue.json")
+    print("\nSauvegardé dans data/diag_ligue.json")
 
-    # Commit
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
     subprocess.run(["git", "add", "data/diag_ligue.json"], check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if diff.returncode != 0:
-        subprocess.run(["git", "commit", "-m", f"diag_ligue [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
+        subprocess.run(["git", "commit", "-m", f"diag_ligue v2 [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
