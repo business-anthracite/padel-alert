@@ -1,11 +1,12 @@
 """
-Diag v15 — Recherche VILLE avec nouveaux critères : pagination fonctionne ?
-Si oui : revenir à l'approche multi-villes (v5) mais avec les nouveaux critères.
-Bonus : tester sort=dateFin asc pour voir les tournois courts en premier.
+Diag v16 — Test fbid frais + random sampling
+Hypothèse : chaque fbid frais retourne un sous-ensemble différent des 1147 résultats.
+Si oui : faire N appels avec N fbids frais = N×30 uniques → couvre les 1147.
 """
 import json, time, subprocess, os
 from datetime import datetime, timedelta
 import requests
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 TENUP_BASE   = "https://tenup.fft.fr"
@@ -33,8 +34,21 @@ NEW_CRITERIA = {
     "surface[GAZON]": "GAZON", "surface[AUTRE]": "AUTRE",
 }
 
+VILLE_PARAMS = {
+    "recherche_type": "ville",
+    "ville[autocomplete][country]": "fr",
+    "ville[autocomplete][textfield]": "",
+    "ville[autocomplete][value_container][value_field]": "Paris, 75001",
+    "ville[autocomplete][value_container][label_field]": "Paris, 75, Paris, Île-de-France",
+    "ville[autocomplete][value_container][lat_field]": "48.859489",
+    "ville[autocomplete][value_container][lng_field]": "2.347880",
+    "ville[distance][value_field]": "100",
+    "sort": "_DIST_",
+}
+LIGUE_PARAMS = {"recherche_type": "ligue", "cbrappel[]": "57", "sort": "dateDebut asc"}
 
-def get_session():
+
+def get_playwright_session():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         ctx = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)", locale="fr-FR")
@@ -58,6 +72,13 @@ def make_session(cookies):
         s.cookies.set(k, v)
     return s
 
+def refresh_fbid(session):
+    """Obtenir un fbid frais via GET (rapide, ~0.5s)."""
+    resp = session.get(TENUP_SEARCH, timeout=30)
+    soup = BeautifulSoup(resp.text, "html.parser")
+    el = soup.find("input", {"name": "form_build_id"})
+    return el["value"] if el else None
+
 def call(session, fbid, extra, page_num=0):
     now = datetime.now()
     p = {
@@ -77,104 +98,73 @@ def call(session, fbid, extra, page_num=0):
             if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
                 res = cmd.get("results", {})
                 items = res.get("items", [])
-                return res.get("nb_results", 0), [str(it.get("id","")) for it in items], items
-        return 0, [], []
+                return res.get("nb_results", 0), [str(it.get("id","")) for it in items]
+        return 0, []
     except Exception as e:
-        return 0, [], []
-
-
-VILLE_PARIS = {
-    "recherche_type": "ville",
-    "ville[autocomplete][country]": "fr",
-    "ville[autocomplete][textfield]": "",
-    "ville[autocomplete][value_container][value_field]": "Paris, 75001",
-    "ville[autocomplete][value_container][label_field]": "Paris, 75, Paris, Île-de-France",
-    "ville[autocomplete][value_container][lat_field]": "48.859489",
-    "ville[autocomplete][value_container][lng_field]": "2.347880",
-    "ville[distance][value_field]": "100",
-}
+        return 0, []
 
 
 def main():
     output = {"run_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "tests": [], "conclusion": ""}
 
-    print("Session...")
-    fbid, cookies = get_session()
+    print("Session Playwright...")
+    fbid_initial, cookies = get_playwright_session()
     session = make_session(cookies)
+    print(f"fbid initial: {fbid_initial[:35]}")
 
-    # ── Test 1 : ville Paris + nouveaux critères + sort=_DIST_ (pages 0,1,2) ──
-    print("\n[1] Ville Paris 100km + critères + sort=_DIST_ — pages 0,1,2")
+    # ── Test 1 : 5 appels avec fbid FRAIS (refresh_fbid) ──────────────────────
+    print("\n[1] 5 appels ligue + critères avec fbid FRAIS (refresh_fbid)")
     all_ids = set()
-    for pg in range(3):
-        nb, ids, items = call(session, fbid, {**VILLE_PARIS, "sort": "_DIST_", **NEW_CRITERIA}, pg)
-        overlap = set(ids) & all_ids
+    for i in range(5):
+        fbid_fresh = refresh_fbid(session)
+        print(f"  fbid_{i}: {(fbid_fresh or '')[:30]}")
+        nb, ids = call(session, fbid_fresh, {**LIGUE_PARAMS, **NEW_CRITERIA}, 0)
         new_ids = set(ids) - all_ids
         all_ids.update(ids)
-        print(f"  Page {pg}: nb={nb} items={len(ids)} new={len(new_ids)} overlap={len(overlap)}")
-        if items:
-            print(f"    Exemple: {items[0].get('libelle','')} | {items[0].get('installation',{}).get('ville','')} | date={items[0].get('dateDebut',{}).get('date','')[:10]}")
-        output["tests"].append({
-            "label": f"ville+critères+_DIST_ page{pg}",
-            "nb": nb, "new_unique": len(new_ids), "overlap": len(overlap),
-        })
+        print(f"  Call {i}: nb={nb} items={len(ids)} new={len(new_ids)}")
+        output["tests"].append({"label": f"ligue_fresh_fbid_{i}", "nb": nb, "new_ids": len(new_ids), "total_unique": len(all_ids)})
         time.sleep(0.4)
 
-    ville_pagination_ok = len(all_ids) > 30
-    print(f"\n  Unique après 3 pages : {len(all_ids)} — pagination_ok={ville_pagination_ok}")
+    random_sampling_works = len(all_ids) > 30
+    print(f"\n  Total unique après 5 calls fresh fbid : {len(all_ids)}")
+    print(f"  random_sampling_works : {random_sampling_works}")
+    output["random_sampling_unique_5"] = len(all_ids)
+    output["random_sampling_works"] = random_sampling_works
 
-    # ── Test 2 : ville Paris + critères + sort=dateFin asc ──────────────────
-    print("\n[2] Ville Paris + critères + sort=dateFin asc — pages 0,1")
-    all_ids_fin = set()
-    for pg in range(2):
-        nb, ids, items = call(session, fbid, {**VILLE_PARIS, "sort": "dateFin asc", **NEW_CRITERIA}, pg)
-        new_ids = set(ids) - all_ids_fin
-        all_ids_fin.update(ids)
-        print(f"  Page {pg}: nb={nb} items={len(ids)} new={len(new_ids)}")
-        if items:
-            raw = items[0].get('dateFin',{})
-            fin = raw.get('date','')[:10] if isinstance(raw,dict) else ''
-            print(f"    Premier: {items[0].get('libelle','')} | dateFin={fin}")
-        output["tests"].append({"label": f"ville+dateFin asc page{pg}", "nb": nb, "new_unique": len(new_ids)})
+    # ── Test 2 : Estimer le total avec N calls ────────────────────────────────
+    if random_sampling_works:
+        print("\n[2] Estimation total avec 40 calls (sampling)")
+        for i in range(5, 40):
+            fbid_fresh = refresh_fbid(session)
+            nb, ids = call(session, fbid_fresh, {**LIGUE_PARAMS, **NEW_CRITERIA}, 0)
+            new_ids = set(ids) - all_ids
+            all_ids.update(ids)
+            if i % 10 == 0:
+                print(f"  Call {i}: total_unique={len(all_ids)}")
+            output["tests"].append({"label": f"ligue_fresh_fbid_{i}", "new_ids": len(new_ids), "total_unique": len(all_ids)})
+            time.sleep(0.3)
+        print(f"  Total unique après 40 calls : {len(all_ids)}")
+        output["random_sampling_unique_40"] = len(all_ids)
+
+    # ── Test 3 : Ville Paris, même approche ───────────────────────────────────
+    print("\n[3] 5 appels VILLE Paris + critères avec fbid frais")
+    all_ville = set()
+    for i in range(5):
+        fbid_fresh = refresh_fbid(session)
+        nb, ids = call(session, fbid_fresh, {**VILLE_PARAMS, **NEW_CRITERIA}, 0)
+        new_ids = set(ids) - all_ville
+        all_ville.update(ids)
+        print(f"  Call {i}: nb={nb} new={len(new_ids)} total={len(all_ville)}")
+        output["tests"].append({"label": f"ville_fresh_fbid_{i}", "nb": nb, "new_ids": len(new_ids)})
         time.sleep(0.4)
-
-    # ── Test 3 : ligue + critères + sort=dateFin asc ─────────────────────────
-    print("\n[3] Ligue + critères + sort=dateFin asc — pages 0,1")
-    all_ids_ligue = set()
-    for pg in range(2):
-        nb, ids, items = call(session, fbid, {
-            "recherche_type": "ligue", "cbrappel[]": "57",
-            "sort": "dateFin asc", **NEW_CRITERIA
-        }, pg)
-        new_ids = set(ids) - all_ids_ligue
-        all_ids_ligue.update(ids)
-        print(f"  Page {pg}: nb={nb} items={len(ids)} new={len(new_ids)}")
-        if items:
-            raw = items[0].get('dateFin',{})
-            fin = raw.get('date','')[:10] if isinstance(raw,dict) else ''
-            print(f"    Premier: {items[0].get('libelle','')} | dateFin={fin}")
-        output["tests"].append({"label": f"ligue+dateFin asc page{pg}", "nb": nb, "new_unique": len(new_ids)})
-        time.sleep(0.4)
-
-    # ── Test 4 : ville Paris SANS critères + sort=_DIST_ — pages 0,1,2 ──────
-    print("\n[4] Ville Paris SANS critères (contrôle pagination) — pages 0,1,2")
-    all_sans = set()
-    for pg in range(3):
-        nb, ids, _ = call(session, fbid, {**VILLE_PARIS, "sort": "_DIST_"}, pg)
-        new_ids = set(ids) - all_sans
-        all_sans.update(ids)
-        print(f"  Page {pg}: nb={nb} items={len(ids)} new={len(new_ids)}")
-        output["tests"].append({"label": f"ville sans critères page{pg}", "nb": nb, "new_unique": len(new_ids)})
-        time.sleep(0.4)
-
-    sans_pagination_ok = len(all_sans) > 30
-    print(f"\n  Sans critères unique 3p: {len(all_sans)} — pagination_ok={sans_pagination_ok}")
+    print(f"  Total unique ville 5 calls : {len(all_ville)}")
+    output["ville_sampling_unique_5"] = len(all_ville)
 
     # Résumé
-    output["ville_avec_criteres_pagination"] = ville_pagination_ok
-    output["ville_sans_criteres_pagination"] = sans_pagination_ok
     output["conclusion"] = (
-        f"ville+critères pag={'OK' if ville_pagination_ok else 'KO'}, "
-        f"ville sans critères pag={'OK' if sans_pagination_ok else 'KO'}"
+        f"ligue_fresh_fbid_unique_5={output.get('random_sampling_unique_5',0)}, "
+        f"ligue_fresh_fbid_unique_40={output.get('random_sampling_unique_40','N/A')}, "
+        f"sampling_works={random_sampling_works}"
     )
     print(f"\n=== CONCLUSION : {output['conclusion']}")
 
@@ -187,7 +177,7 @@ def main():
     subprocess.run(["git", "add", "data/diag_ligue.json"], check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if diff.returncode != 0:
-        subprocess.run(["git", "commit", "-m", f"diag_ligue v15 ville+pag [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
+        subprocess.run(["git", "commit", "-m", f"diag_ligue v16 fresh_fbid [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
