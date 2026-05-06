@@ -1,332 +1,425 @@
 {
-  "run_at": "2026-05-06T17:06:05Z",
+  "run_at": "2026-05-06T17:14:16Z",
   "tests": [
     {
-      "label": "ville bare sans critères",
-      "nb": 0,
+      "label": "ville Paris sort=_DIST_",
+      "nb": 1484,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=1484)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
     },
     {
-      "label": "ville + epreuve",
-      "nb": 0,
+      "label": "ville Paris sort=dateDebut asc",
+      "nb": 1484,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=1484)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
     },
     {
-      "label": "ville + categorie_age_standard",
-      "nb": 0,
+      "label": "ligue IDF sort=dateDebut asc",
+      "nb": 10000,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
     },
     {
-      "label": "ville + categorie_age_plus45_55",
-      "nb": 0,
+      "label": "ligue 50 AUVERGNE RHONE-ALPES",
+      "ligue_id": "50",
+      "pagination_ok": true,
+      "nb": 10000,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
     },
     {
-      "label": "ville + type_competition",
-      "nb": 0,
+      "label": "ligue 51 BOURGOGNE FRANCHE COMTE",
+      "ligue_id": "51",
+      "pagination_ok": true,
+      "nb": 10000,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
     },
     {
-      "label": "ville + categorie_tournoi",
-      "nb": 0,
+      "label": "ligue 52 BRETAGNE",
+      "ligue_id": "52",
+      "pagination_ok": true,
+      "nb": 10000,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
     },
     {
-      "label": "ville + all SAUF +45/55",
-      "nb": 0,
+      "label": "ligue 53 CENTRE VAL DE LOIRE",
+      "ligue_id": "53",
+      "pagination_ok": true,
+      "nb": 10000,
       "msgs": [
-        "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
-        "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
       ],
-      "http": 200,
-      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"d6J089jdWhzmWK9INNFqEdRMcjZGXNj03Ysiwnbx_sw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0"
+      "http": 200
+    },
+    {
+      "label": "ligue 54 CORSE",
+      "ligue_id": "54",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 55 GRAND EST",
+      "ligue_id": "55",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 63 GUADELOUPE ST MARTIN ST BARTH",
+      "ligue_id": "63",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 64 GUYANE",
+      "ligue_id": "64",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 56 HAUTS DE FRANCE",
+      "ligue_id": "56",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 57 ILE DE FRANCE",
+      "ligue_id": "57",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 65 MARTINIQUE",
+      "ligue_id": "65",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 58 NORMANDIE",
+      "ligue_id": "58",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 59 NOUVELLE AQUITAINE",
+      "ligue_id": "59",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 66 NOUVELLE CALEDONIE",
+      "ligue_id": "66",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 60 OCCITANIE",
+      "ligue_id": "60",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 61 PAYS DE LA LOIRE",
+      "ligue_id": "61",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 62 PROVENCE ALPES COTE D'AZUR",
+      "ligue_id": "62",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
+    },
+    {
+      "label": "ligue 67 REUNION - MAYOTTE",
+      "ligue_id": "67",
+      "pagination_ok": true,
+      "nb": 10000,
+      "msgs": [
+        "settings",
+        "invoke",
+        "insert()",
+        "update(nb=10000)",
+        "insert()",
+        "insert(<div class=\"recherche-tournois-main-action-secondary\"><div class=\"recherche-tour)"
+      ],
+      "http": 200
     }
   ],
-  "form_values_from_page": {
-    "recherche_type": [
-      "ville",
-      "club",
-      "ligue"
-    ],
-    "ville[autocomplete][country]": [
-      [
-        "fr",
-        "gp",
-        "gf",
-        "re",
-        "mq",
-        "yt",
-        "nc",
-        "pf",
-        "bl",
-        "mf",
-        "pm",
-        "tf",
-        "wf"
-      ]
-    ],
-    "pratique": [
-      "TENNIS",
-      "PADEL",
-      "BEACH",
-      "PICKLE"
-    ],
-    "epreuve[SM]": [
-      "SM"
-    ],
-    "epreuve[SD]": [
-      "SD"
-    ],
-    "epreuve[DX]": [
-      "DX"
-    ],
-    "epreuve[DM]": [
-      "DM"
-    ],
-    "epreuve[DD]": [
-      "DD"
-    ],
-    "categorie_age[70|80|96|97|98|90|95|65|99|100]": [
-      "70|80|96|97|98|90|95|65|99|100"
-    ],
-    "categorie_age[110]": [
-      "110"
-    ],
-    "categorie_age[120]": [
-      "120"
-    ],
-    "categorie_age[125]": [
-      "125"
-    ],
-    "categorie_age[130]": [
-      "130"
-    ],
-    "categorie_age[140]": [
-      "140"
-    ],
-    "categorie_age[145]": [
-      "145"
-    ],
-    "categorie_age[160]": [
-      "160"
-    ],
-    "categorie_age[180]": [
-      "180"
-    ],
-    "categorie_age[200]": [
-      "200"
-    ],
-    "categorie_age[350]": [
-      "350"
-    ],
-    "categorie_age[400]": [
-      "400"
-    ],
-    "categorie_age[450]": [
-      "450"
-    ],
-    "categorie_age[500]": [
-      "500"
-    ],
-    "categorie_age[550]": [
-      "550"
-    ],
-    "categorie_age[600]": [
-      "600"
-    ],
-    "categorie_age[650]": [
-      "650"
-    ],
-    "categorie_age[700]": [
-      "700"
-    ],
-    "categorie_age[750]": [
-      "750"
-    ],
-    "categorie_age[800]": [
-      "800"
-    ],
-    "type[T]": [
-      "T"
-    ],
-    "type[C]": [
-      "C"
-    ],
-    "tournois_interne": [
-      "0",
-      "1"
-    ],
-    "famille_tournois[TRADI]": [
-      "TRADI"
-    ],
-    "famille_tournois[MULTI]": [
-      "MULTI"
-    ],
-    "famille_tournois[TMC_D]": [
-      "TMC_D"
-    ],
-    "famille_tournois[TMC_M]": [
-      "TMC_M"
-    ],
-    "famille_tournois[COURT_ADUL]": [
-      "COURT_ADUL"
-    ],
-    "famille_tournois[TRADI_V]": [
-      "TRADI_V"
-    ],
-    "famille_tournois[MULTI_V]": [
-      "MULTI_V"
-    ],
-    "famille_tournois[GALAXIE_O]": [
-      "GALAXIE_O"
-    ],
-    "famille_tournois[GALAXIE_V]": [
-      "GALAXIE_V"
-    ],
-    "famille_tournois[CNGT]": [
-      "CNGT"
-    ],
-    "famille_tournois[NTC]": [
-      "NTC"
-    ],
-    "surface[B_PIL]": [
-      "B_PIL"
-    ],
-    "surface[DUR  ]": [
-      "DUR  "
-    ],
-    "surface[GAZON]": [
-      "GAZON"
-    ],
-    "surface[AUTRE]": [
-      "AUTRE"
-    ],
-    "inscription_ligne": [
-      "0",
-      "1"
-    ],
-    "paiement_ligne": [
-      "0",
-      "1"
-    ],
-    "limitation_classements": [
-      "1"
-    ],
-    "classements[10060]": [
-      "10060"
-    ],
-    "classements[10063]": [
-      "10063"
-    ],
-    "classements[10064]": [
-      "10064"
-    ],
-    "classements[10065]": [
-      "10065"
-    ],
-    "classements[10070]": [
-      "10070"
-    ],
-    "classements[10080]": [
-      "10080"
-    ],
-    "classements[10090]": [
-      "10090"
-    ],
-    "classements[10100]": [
-      "10100"
-    ],
-    "classements[10110]": [
-      "10110"
-    ],
-    "classements[10120]": [
-      "10120"
-    ],
-    "classements[10130]": [
-      "10130"
-    ],
-    "classements[10140]": [
-      "10140"
-    ],
-    "classements[10150]": [
-      "10150"
-    ],
-    "classements[10160]": [
-      "10160"
-    ],
-    "classements[10170]": [
-      "10170"
-    ],
-    "classements[10180]": [
-      "10180"
-    ],
-    "classements[10190]": [
-      "10190"
-    ],
-    "classements[10200]": [
-      "10200"
-    ],
-    "classements[10210]": [
-      "10210"
-    ],
-    "classements[10220]": [
-      "10220"
-    ],
-    "classements[10230]": [
-      "10230"
-    ],
-    "classements[10240]": [
-      "10240"
-    ],
-    "classements[10250]": [
-      "10250"
-    ],
-    "classements[10260]": [
-      "10260"
-    ],
-    "classements[10270]": [
-      "10270"
-    ],
-    "classements[10247]": [
-      "10247"
-    ],
-    "sort": [
-      [
-        "_DIST_",
-        "dateDebut asc",
-        "dateFin asc"
-      ]
-    ]
-  },
-  "conclusion": "ville_bare=KO, ville_sans_45_55=KO, ligues_ok=0"
+  "working_ligues": [
+    {
+      "id": "50",
+      "name": "AUVERGNE RHONE-ALPES",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "51",
+      "name": "BOURGOGNE FRANCHE COMTE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "52",
+      "name": "BRETAGNE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "53",
+      "name": "CENTRE VAL DE LOIRE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "54",
+      "name": "CORSE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "55",
+      "name": "GRAND EST",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "63",
+      "name": "GUADELOUPE ST MARTIN ST BARTH",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "64",
+      "name": "GUYANE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "56",
+      "name": "HAUTS DE FRANCE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "57",
+      "name": "ILE DE FRANCE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "65",
+      "name": "MARTINIQUE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "58",
+      "name": "NORMANDIE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "59",
+      "name": "NOUVELLE AQUITAINE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "66",
+      "name": "NOUVELLE CALEDONIE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "60",
+      "name": "OCCITANIE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "61",
+      "name": "PAYS DE LA LOIRE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "62",
+      "name": "PROVENCE ALPES COTE D'AZUR",
+      "nb_results": 10000,
+      "pagination_ok": true
+    },
+    {
+      "id": "67",
+      "name": "REUNION - MAYOTTE",
+      "nb_results": 10000,
+      "pagination_ok": true
+    }
+  ],
+  "conclusion": "ville=OK(dateDebut asc), ligue=OK(dateDebut asc), working=18/18"
 }
