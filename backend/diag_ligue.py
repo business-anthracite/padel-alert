@@ -1,7 +1,8 @@
 """
-Padel Alert — Diagnostic ligue v13
-Découverte v12 : les nouveaux critères sont famille_tournois[], categorie_age[], type[], surface[]
-Test : PADEL + nouveaux critères complets → est-ce qu'on obtient beaucoup plus de résultats ?
+Diag v14 — Vérification pagination avec nouveaux critères
+Test : les pages 0..5 ont-elles des IDs différents avec les nouveaux critères ?
+Si oui : on peut paginer, on obtient 1147 uniques.
+Si non : pagination cyclique, on obtient seulement 30 uniques avec critères.
 """
 import json, time, subprocess, os
 from datetime import datetime, timedelta
@@ -12,7 +13,6 @@ TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
 
-# Nouveaux critères découverts en v12
 NEW_CRITERIA_PADEL = {
     "epreuve[DX]": "DX", "epreuve[DM]": "DM", "epreuve[DD]": "DD",
     "categorie_age[70|80|96|97|98|90|95|65|99|100]": "70|80|96|97|98|90|95|65|99|100",
@@ -38,8 +38,7 @@ NEW_CRITERIA_PADEL = {
 def get_session():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", locale="fr-FR")
+        ctx = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64)", locale="fr-FR")
         page = ctx.new_page()
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(7000)
@@ -52,8 +51,7 @@ def get_session():
 def make_session(cookies):
     s = requests.Session()
     s.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "User-Agent": "Mozilla/5.0", "Accept": "application/json, */*; q=0.01",
         "Accept-Language": "fr-FR,fr;q=0.9",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "Origin": TENUP_BASE, "Referer": TENUP_SEARCH, "X-Requested-With": "XMLHttpRequest",
@@ -65,7 +63,7 @@ def make_session(cookies):
 
 def call(session, fbid, extra, page_num=0):
     now = datetime.now()
-    params = {
+    p = {
         "pratique": "PADEL",
         "date[start]": now.strftime("%d/%m/%y"),
         "date[end]": (now + timedelta(days=90)).strftime("%d/%m/%y"),
@@ -73,102 +71,84 @@ def call(session, fbid, extra, page_num=0):
         "form_id": "recherche_tournois_form",
         "_triggering_element_name": "submit_main",
         "_triggering_element_value": "Rechercher",
-        "form_build_id": fbid,
-        "page": str(page_num),
+        "form_build_id": fbid, "page": str(page_num),
     }
-    params.update(extra)
+    p.update(extra)
     try:
-        r = session.post(TENUP_AJAX, data=params, timeout=45)
+        r = session.post(TENUP_AJAX, data=p, timeout=45)
         r.raise_for_status()
         for cmd in r.json():
             if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
                 res = cmd.get("results", {})
                 items = res.get("items", [])
-                return {
-                    "nb_results": res.get("nb_results", 0),
-                    "nb_items": len(items),
-                    "first_id": items[0].get("id") if items else None,
-                    "http": r.status_code,
-                }
-        cmds = [c.get("command") for c in r.json() if isinstance(c, dict)]
-        return {"nb_results": 0, "nb_items": 0, "commands": cmds, "raw": r.text[:200]}
+                return res.get("nb_results", 0), [str(it.get("id","")) for it in items]
+        return 0, []
     except Exception as e:
-        return {"error": str(e)}
+        return 0, []
 
 
 def main():
-    output = {"run_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "tests": [], "conclusion": ""}
+    output = {"run_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "pagination_tests": [], "scrape_test": {}}
 
     print("Session...")
     fbid, cookies = get_session()
     session = make_session(cookies)
-    print(f"fbid: {fbid[:35]}")
+    base = {"recherche_type": "ligue", "cbrappel[]": "57"}
 
-    base_ligue = {"recherche_type": "ligue", "cbrappel[]": "57"}
+    print("\n=== Test pagination pages 0-5 avec critères ===")
+    all_ids = set()
+    for pg in range(6):
+        nb, ids = call(session, fbid, {**base, **NEW_CRITERIA_PADEL}, pg)
+        overlap = set(ids) & all_ids
+        new_ids = set(ids) - all_ids
+        all_ids.update(ids)
+        print(f"  Page {pg}: nb={nb} items={len(ids)} new_unique={len(new_ids)} overlap={len(overlap)}")
+        output["pagination_tests"].append({
+            "page": pg, "nb_results": nb, "nb_items": len(ids),
+            "new_unique": len(new_ids), "overlap_with_prev": len(overlap),
+            "ids": ids[:5],  # juste les 5 premiers
+        })
+        time.sleep(0.3)
 
-    # Test 1 : sans critères (baseline = 27)
-    print("\n[1] Sans critères (baseline)")
-    r = call(session, fbid, base_ligue)
-    print(f"  → nb={r.get('nb_results')} items={r.get('nb_items')}")
-    output["tests"].append({"label": "sans critères", **r})
-    time.sleep(0.5)
+    total_unique = len(all_ids)
+    print(f"\n  Total unique après 6 pages : {total_unique}")
+    output["unique_after_6_pages"] = total_unique
+    output["pagination_works"] = total_unique > 30
 
-    # Test 2 : avec TOUS les nouveaux critères
-    print("\n[2] Avec nouveaux critères PADEL complets")
-    r = call(session, fbid, {**base_ligue, **NEW_CRITERIA_PADEL})
-    print(f"  → nb={r.get('nb_results')} items={r.get('nb_items')}")
-    output["tests"].append({"label": "nouveaux critères complets", **r})
-    time.sleep(0.5)
+    # Si pagination fonctionne, scraper les 38 premières pages
+    if output["pagination_works"]:
+        print("\n=== Scraping pages 0-37 (1147/30 ≈ 38 pages) ===")
+        all_scraped = {}
+        for pg in range(38):
+            nb, ids = call(session, fbid, {**base, **NEW_CRITERIA_PADEL}, pg)
+            if not ids:
+                print(f"  Page {pg}: vide — arrêt")
+                break
+            for iid in ids:
+                all_scraped[iid] = True
+            if pg % 10 == 0:
+                print(f"  Page {pg}: {len(all_scraped)} uniques")
+            time.sleep(0.2)
+        print(f"  Total unique scraping : {len(all_scraped)}")
+        output["scrape_test"] = {"total_unique": len(all_scraped), "pages_scraped": pg + 1}
 
-    # Test 3 : uniquement famille_tournois (sans âge ni surface)
-    print("\n[3] Uniquement famille_tournois")
-    famille_only = {k: v for k, v in NEW_CRITERIA_PADEL.items() if "famille_tournois" in k}
-    r = call(session, fbid, {**base_ligue, **famille_only})
-    print(f"  → nb={r.get('nb_results')} items={r.get('nb_items')}")
-    output["tests"].append({"label": "famille_tournois uniquement", **r})
-    time.sleep(0.5)
-
-    # Test 4 : uniquement epreuve padel (DM, DD, DX)
-    print("\n[4] Uniquement epreuve padel (DM, DD, DX)")
-    epreuve_only = {k: v for k, v in NEW_CRITERIA_PADEL.items() if "epreuve" in k and k != "epreuve[SM]" and k != "epreuve[SD]"}
-    r = call(session, fbid, {**base_ligue, **epreuve_only})
-    print(f"  → nb={r.get('nb_results')} items={r.get('nb_items')}")
-    output["tests"].append({"label": "epreuve DM+DD+DX uniquement", **r})
-    time.sleep(0.5)
-
-    # Test 5 : page 1 avec critères complets (pagination)
-    best_nb = max(t.get("nb_results", 0) for t in output["tests"])
-    if best_nb > 30:
-        best_test = max(output["tests"], key=lambda t: t.get("nb_results", 0))
-        print(f"\n[5] Page 1 avec les meilleurs critères (nb={best_nb})")
-        r = call(session, fbid, {**base_ligue, **NEW_CRITERIA_PADEL}, page_num=1)
-        print(f"  → nb={r.get('nb_results')} items={r.get('nb_items')} first_id={r.get('first_id')}")
-        prev_first = output["tests"][1].get("first_id")
-        pagination_ok = r.get("first_id") and prev_first and r["first_id"] != prev_first
-        print(f"  pagination_ok: {pagination_ok}")
-        output["tests"].append({"label": "page 1 critères complets", "pagination_ok": pagination_ok, **r})
-
-    # Test 6 : ville Paris avec nouveaux critères (contrôle)
-    print("\n[6] Ville Paris + nouveaux critères (contrôle)")
-    r = call(session, fbid, {
-        "recherche_type": "ville",
-        "ville[autocomplete][country]": "fr",
-        "ville[autocomplete][textfield]": "",
-        "ville[autocomplete][value_container][value_field]": "Paris, 75001",
-        "ville[autocomplete][value_container][label_field]": "Paris, 75, Paris, Île-de-France",
-        "ville[autocomplete][value_container][lat_field]": "48.859489",
-        "ville[autocomplete][value_container][lng_field]": "2.347880",
-        "ville[distance][value_field]": "50",
-        "sort": "_DIST_",
-        **NEW_CRITERIA_PADEL,
+    # Test étendu : date range plus large (180 jours)
+    print("\n=== Test date range élargi (180 jours) ===")
+    now = datetime.now()
+    nb_180, ids_180 = call(session, fbid, {
+        **base, **NEW_CRITERIA_PADEL,
+        "date[start]": now.strftime("%d/%m/%y"),
+        "date[end]": (now + timedelta(days=180)).strftime("%d/%m/%y"),
     })
-    print(f"  → nb={r.get('nb_results')} items={r.get('nb_items')}")
-    output["tests"].append({"label": "ville Paris + nouveaux critères", **r})
+    print(f"  180 jours : nb={nb_180} items={len(ids_180)}")
+    output["date_180_nb"] = nb_180
 
     print(f"\n=== RÉSUMÉ ===")
-    for t in output["tests"]:
-        print(f"  {t['label']}: nb={t.get('nb_results',0)}")
-    output["conclusion"] = f"max_nb={max(t.get('nb_results',0) for t in output['tests'])}"
+    print(f"pagination_works: {output['pagination_works']}")
+    print(f"unique après 6 pages: {output['unique_after_6_pages']}")
+    if output.get("scrape_test"):
+        print(f"unique scraping 38p: {output['scrape_test'].get('total_unique')}")
+    print(f"nb avec 180 jours: {nb_180}")
 
     os.makedirs("data", exist_ok=True)
     with open("data/diag_ligue.json", "w", encoding="utf-8") as f:
@@ -179,7 +159,7 @@ def main():
     subprocess.run(["git", "add", "data/diag_ligue.json"], check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if diff.returncode != 0:
-        subprocess.run(["git", "commit", "-m", f"diag_ligue v13 new_criteria [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
+        subprocess.run(["git", "commit", "-m", f"diag_ligue v14 pagination_check [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
