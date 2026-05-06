@@ -63,9 +63,14 @@ def make_session(cookies):
 # ── AJAX ───────────────────────────────────────────────────────────────────────
 
 def ajax_page(session, fbid, date_start, date_end, page_num):
-    """Appel AJAX global (pas de filtre ligue). Retourne (items, nb_total)."""
+    """Appel AJAX global. Retourne (items, nb_total).
+    Note : cbrappel[]=57 est requis pour la pagination côté serveur
+    (sans lui le serveur renvoie toujours la même page 0, même si le
+    filtre ligue ne filtre pas réellement les résultats).
+    """
     data = {
-        "recherche_type": "ligue",   # mode ligue = pool global padel
+        "recherche_type": "ligue",
+        "cbrappel[]": "57",          # requis pour pagination (IDF=57, filtre ignoré côté serveur)
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
@@ -116,10 +121,16 @@ def parse_item(item):
     if date_debut:
         try:
             d = datetime.strptime(date_debut[:10], "%Y-%m-%d")
+            if d.year < 2000:
+                raise ValueError("année invalide")
             date_str = f"{JOURS[d.weekday()]} {d.strftime('%d/%m/%Y')}"
             if date_fin and date_fin[:10] != date_debut[:10]:
-                d2 = datetime.strptime(date_fin[:10], "%Y-%m-%d")
-                date_str += f" → {JOURS[d2.weekday()]} {d2.strftime('%d/%m/%Y')}"
+                try:
+                    d2 = datetime.strptime(date_fin[:10], "%Y-%m-%d")
+                    if d2.year >= 2000:
+                        date_str += f" → {JOURS[d2.weekday()]} {d2.strftime('%d/%m/%Y')}"
+                except Exception:
+                    pass
         except Exception:
             date_str = date_debut[:10]
     else:
