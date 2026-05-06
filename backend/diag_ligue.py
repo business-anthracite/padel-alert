@@ -1,176 +1,307 @@
 """
-Diagnostic ligue v11 — Test chevauchement inter-ligues + approche optimale
-Vérifie si CORSE (54) et IDF (57) retournent des IDs différents.
-Si oui : approche par ligue nécessaire.
-Si non : une seule requête "toutes ligues" suffit (10k uniques en ~5 min).
+Padel Alert — Diagnostic ligue v12
+Objectif : intercepter la VRAIE requête AJAX du formulaire Ten'Up (avec comités).
+Le modal Vue.js a 2 étapes :
+  1. Sélection ligue (cbrappel[]) → SUIVANT
+  2. Sélection comités → soumettre
+Sans l'étape 2, on n'obtient que 27 résultats (au lieu de 2000+ pour PACA).
+On cherche les paramètres comité + comment les soumettre.
 """
 import json, time, subprocess, os
 from datetime import datetime, timedelta
-import requests
 from playwright.sync_api import sync_playwright
 
 TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
 
-ALL_LIGUES_IDS = ["50","51","52","53","54","55","63","64","56","57","65","58","59","66","60","61","62","67"]
 
-def get_session():
+def intercept_full_form_submission():
+    result = {
+        "all_requests": [],
+        "ajax_requests": [],
+        "intercepted_submit_params": None,
+        "intercepted_submit_response_nb": None,
+        "dom_snapshots": {},
+        "error": None,
+    }
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", locale="fr-FR")
+        ctx = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            locale="fr-FR",
+        )
         page = ctx.new_page()
+
+        # Intercepter TOUTES les requêtes réseau
+        def on_req(req):
+            if req.method in ("POST", "GET") and "tenup" in req.url:
+                entry = {"url": req.url, "method": req.method, "post_data": req.post_data or ""}
+                result["all_requests"].append(entry)
+                if "/system/ajax" in req.url or "/api" in req.url:
+                    result["ajax_requests"].append(entry)
+        def on_resp(resp):
+            if "/system/ajax" in resp.url and resp.status == 200:
+                try:
+                    import re
+                    body = resp.text()
+                    m = re.search(r'"nb_results":(\d+)', body)
+                    if m and int(m.group(1)) > 100:
+                        # Requête prometteuse avec beaucoup de résultats
+                        result["intercepted_submit_response_nb"] = int(m.group(1))
+                        # Trouver la requête correspondante
+                        if result["ajax_requests"]:
+                            result["intercepted_submit_params"] = result["ajax_requests"][-1]["post_data"]
+                        result["successful_response_excerpt"] = body[:2000]
+                except:
+                    pass
+        page.on("request", on_req)
+        page.on("response", on_resp)
+
+        print("  Chargement Ten'Up...")
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(7000)
+        page.wait_for_timeout(8000)
+
         fbid = page.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value")
-        cookies = {c["name"]: c["value"] for c in ctx.cookies()}
-        browser.close()
-    return fbid, cookies
+        print(f"  fbid: {(fbid or '')[:35]}")
+        result["fbid"] = fbid
 
-def make_session(cookies):
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json, text/javascript, */*; q=0.01",
-        "Accept-Language": "fr-FR,fr;q=0.9",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Origin": TENUP_BASE, "Referer": TENUP_SEARCH, "X-Requested-With": "XMLHttpRequest",
-    })
-    for k, v in cookies.items():
-        s.cookies.set(k, v)
-    return s
+        # ÉTAPE 1 : Activer ligue mode + ouvrir modal
+        print("  Activation mode ligue + ouverture modal...")
+        page.evaluate("""
+            () => {
+                // Activer radio ligue
+                const r = document.querySelector('#edit-recherche-type-ligue');
+                if (r) { r.checked = true; r.dispatchEvent(new Event('change', {bubbles:true})); }
+                // Afficher la section ligue
+                const s = document.querySelector('#edit-ligue');
+                if (s) s.style.cssText = 'display:block!important';
+                // Afficher le modal app
+                const app = document.querySelector('#app');
+                if (app) app.style.cssText = 'display:block!important';
+                // Afficher overlay
+                const ov = document.querySelector('#overlay-modal-creneau');
+                if (ov) ov.style.cssText = 'display:block!important';
+            }
+        """)
+        page.wait_for_timeout(2000)
 
-def get_page(session, fbid, extra, page_num=0):
-    now = datetime.now()
-    params = {
-        "pratique": "PADEL",
-        "date[start]": now.strftime("%d/%m/%y"),
-        "date[end]": (now + timedelta(days=90)).strftime("%d/%m/%y"),
-        "sort": "dateDebut asc",
-        "form_id": "recherche_tournois_form",
-        "_triggering_element_name": "submit_main",
-        "_triggering_element_value": "Rechercher",
-        "form_build_id": fbid,
-        "page": str(page_num),
-    }
-    params.update(extra)
-    try:
-        r = session.post(TENUP_AJAX, data=params, timeout=45)
-        r.raise_for_status()
-        for cmd in r.json():
-            if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                res = cmd.get("results", {})
-                items = res.get("items", [])
-                return {
-                    "nb_results": res.get("nb_results", 0),
-                    "ids": [str(it.get("id","")) for it in items],
-                    "nb_items": len(items),
+        # Snapshot DOM initial
+        result["dom_snapshots"]["after_show_modal"] = page.evaluate("""
+            () => document.querySelector('#app')?.outerHTML?.substring(0, 5000) || ''
+        """)
+
+        # ÉTAPE 2 : Cocher PACA (62_cbrappel) via force click
+        print("  Cochage PACA (62_cbrappel)...")
+        try:
+            # Forcer le cochage via JS
+            page.evaluate("""
+                () => {
+                    const cb = document.querySelector('#\\\\36 2_cbrappel');
+                    if (cb) {
+                        cb.checked = true;
+                        cb.dispatchEvent(new Event('change', {bubbles:true}));
+                        cb.dispatchEvent(new Event('input', {bubbles:true}));
+                        cb.dispatchEvent(new Event('click', {bubbles:true}));
+                    }
+                    // Alternative : chercher par label PACA
+                    document.querySelectorAll('label').forEach(l => {
+                        if (l.textContent.trim().includes("PROVENCE")) {
+                            const id = l.getAttribute('for');
+                            const inp = document.querySelector('#' + id);
+                            if (inp) {
+                                inp.checked = true;
+                                ['change','input','click'].forEach(e =>
+                                    inp.dispatchEvent(new Event(e, {bubbles:true}))
+                                );
+                            }
+                        }
+                    });
                 }
-        return {"nb_results": 0, "ids": [], "nb_items": 0, "raw": r.text[:200]}
-    except Exception as e:
-        return {"error": str(e)}
+            """)
+            page.wait_for_timeout(2000)
+            print("  PACA coché via JS")
+        except Exception as e:
+            print(f"  Erreur cochage: {e}")
+
+        # Snapshot DOM après cochage
+        result["dom_snapshots"]["after_paca_check"] = page.evaluate("""
+            () => document.querySelector('#app')?.outerHTML?.substring(0, 5000) || ''
+        """)
+
+        # Vérifier état checkbox PACA
+        paca_state = page.evaluate("""
+            () => {
+                const candidates = [];
+                document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    if (cb.id && cb.id.includes('62') || cb.id.includes('cbrappel')) {
+                        candidates.push({id: cb.id, checked: cb.checked, name: cb.name});
+                    }
+                });
+                return candidates;
+            }
+        """)
+        print(f"  État checkboxes ligue : {paca_state}")
+
+        # ÉTAPE 3 : Cliquer SUIVANT
+        print("  Tentative clic SUIVANT...")
+        suivant_clicked = False
+        for selector in ['a:has-text("SUIVANT")', '.btn-primary', 'a.btn-primary', 'button:has-text("SUIVANT")', '[class*="suivant"]', 'a[href="#"]']:
+            try:
+                page.click(selector, force=True, timeout=3000)
+                page.wait_for_timeout(2000)
+                suivant_clicked = True
+                print(f"  SUIVANT cliqué via '{selector}'")
+                break
+            except:
+                pass
+
+        if not suivant_clicked:
+            # Essai via JS
+            try:
+                page.evaluate("""
+                    () => {
+                        // Chercher le bouton SUIVANT dans le modal
+                        document.querySelectorAll('a, button').forEach(el => {
+                            if (el.textContent.trim().toUpperCase() === 'SUIVANT') {
+                                el.click();
+                            }
+                        });
+                    }
+                """)
+                page.wait_for_timeout(2000)
+                print("  SUIVANT cliqué via JS forEach")
+                suivant_clicked = True
+            except Exception as e:
+                print(f"  SUIVANT impossible: {e}")
+
+        # Snapshot après SUIVANT
+        result["dom_snapshots"]["after_suivant"] = page.evaluate("""
+            () => document.querySelector('#app')?.outerHTML?.substring(0, 8000) || ''
+        """)
+
+        # ÉTAPE 4 : Sélectionner tous les comités
+        print("  Recherche éléments comité...")
+        comite_elements = page.evaluate("""
+            () => {
+                const els = [];
+                document.querySelectorAll('input[type="checkbox"], [role="checkbox"]').forEach(el => {
+                    if (!el.id || !el.id.includes('cbrappel')) {
+                        els.push({
+                            id: el.id, name: el.name || '', value: el.value || '',
+                            checked: el.checked, class: (el.className||'').substring(0,60)
+                        });
+                    }
+                });
+                return els.slice(0, 50);
+            }
+        """)
+        result["comite_checkboxes_found"] = comite_elements
+        print(f"  Checkboxes non-cbrappel : {len(comite_elements)}")
+        for el in comite_elements[:10]:
+            print(f"    id={el['id']} name={el['name']} value={el['value']} checked={el['checked']}")
+
+        # ÉTAPE 5 : Cliquer "Tous" comités
+        print("  Tentative sélection 'Tous' comités...")
+        try:
+            page.evaluate("""
+                () => {
+                    document.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                        if (!cb.id.includes('cbrappel')) {
+                            cb.checked = true;
+                            cb.dispatchEvent(new Event('change', {bubbles:true}));
+                        }
+                    });
+                    // Aussi chercher label "Tous"
+                    document.querySelectorAll('label').forEach(l => {
+                        if (l.textContent.trim().toLowerCase() === 'tous' || l.textContent.trim().toLowerCase() === 'toutes') {
+                            const inp = document.querySelector('#' + l.getAttribute('for'));
+                            if (inp) { inp.checked = true; inp.dispatchEvent(new Event('change', {bubbles:true})); }
+                        }
+                    });
+                }
+            """)
+            page.wait_for_timeout(1000)
+        except:
+            pass
+
+        # ÉTAPE 6 : Soumettre le formulaire
+        print("  Soumission formulaire...")
+        now = datetime.now()
+        for fname, val in [("date[start]", now.strftime("%d/%m/%y")), ("date[end]", (now + timedelta(days=90)).strftime("%d/%m/%y"))]:
+            try:
+                el = page.query_selector(f'input[name="{fname}"]')
+                if el:
+                    el.evaluate("(el,v)=>{el.value=v;}", val)
+            except:
+                pass
+
+        prev_req_count = len(result["ajax_requests"])
+        try:
+            # Essai de soumission via bouton
+            for sel in ['[name="submit_main"]', 'input[value="Rechercher"]', 'button[type="submit"]']:
+                try:
+                    page.click(sel, force=True, timeout=5000)
+                    break
+                except:
+                    pass
+            try:
+                page.wait_for_load_state("networkidle", timeout=12000)
+            except:
+                page.wait_for_timeout(5000)
+        except Exception as e:
+            print(f"  Submit error: {e}")
+
+        new_reqs = result["ajax_requests"][prev_req_count:]
+        print(f"  Nouvelles requêtes AJAX après submit : {len(new_reqs)}")
+        for req in new_reqs[:3]:
+            print(f"    {req['url']}")
+            print(f"    params: {req['post_data'][:300]}")
+        result["post_submit_ajax_requests"] = new_reqs
+
+        browser.close()
+
+    return result
+
 
 def main():
-    output = {"run_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), "tests": {}, "conclusion": ""}
+    output = {"run_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")}
 
-    print("Session Playwright...")
-    fbid, cookies = get_session()
-    session = make_session(cookies)
-    print(f"fbid: {fbid[:35]}")
+    print("=== Interception formulaire complet ===")
+    res = intercept_full_form_submission()
+    # Sauvegarder tout sauf les snapshots DOM (trop volumineux)
+    res_clean = {k: v for k, v in res.items() if k != "dom_snapshots"}
+    output.update(res_clean)
 
-    # Test 1 : IDF (57) page 0
-    print("\n[1] IDF (57) page 0...")
-    r_idf_0 = get_page(session, fbid, {"recherche_type": "ligue", "cbrappel[]": "57"}, 0)
-    print(f"  nb={r_idf_0.get('nb_results')} ids_p0={r_idf_0.get('ids', [])[:5]}")
-    output["tests"]["idf_page0"] = r_idf_0
-    time.sleep(0.4)
+    # Sauvegarder les snapshots séparément (tronqués)
+    output["dom_after_suivant_excerpt"] = res.get("dom_snapshots", {}).get("after_suivant", "")[:3000]
 
-    # Test 2 : CORSE (54) page 0
-    print("\n[2] CORSE (54) page 0...")
-    r_cor_0 = get_page(session, fbid, {"recherche_type": "ligue", "cbrappel[]": "54"}, 0)
-    print(f"  nb={r_cor_0.get('nb_results')} ids_p0={r_cor_0.get('ids', [])[:5]}")
-    output["tests"]["corse_page0"] = r_cor_0
-    time.sleep(0.4)
-
-    # Comparer IDs page 0
-    idf_ids  = set(r_idf_0.get("ids", []))
-    cor_ids  = set(r_cor_0.get("ids", []))
-    overlap  = idf_ids & cor_ids
-    pct      = len(overlap) / max(len(idf_ids), 1) * 100
-    print(f"\nChevauchement IDF/CORSE page 0 : {len(overlap)}/{len(idf_ids)} = {pct:.0f}%")
-    output["overlap_pct"] = pct
-    output["overlap_ids"] = list(overlap)[:10]
-
-    # Test 3 : toutes ligues en même temps (multi cbrappel[])
-    print("\n[3] Toutes ligues (cbrappel[] multiple) page 0...")
-    multi_params = [("cbrappel[]", lid) for lid in ALL_LIGUES_IDS]
-    multi_params += [
-        ("recherche_type", "ligue"), ("pratique", "PADEL"),
-        ("date[start]", datetime.now().strftime("%d/%m/%y")),
-        ("date[end]", (datetime.now() + timedelta(days=90)).strftime("%d/%m/%y")),
-        ("sort", "dateDebut asc"),
-        ("form_id", "recherche_tournois_form"),
-        ("_triggering_element_name", "submit_main"),
-        ("_triggering_element_value", "Rechercher"),
-        ("form_build_id", fbid), ("page", "0"),
-    ]
-    try:
-        r_all = session.post(TENUP_AJAX, data=multi_params, timeout=45)
-        r_all.raise_for_status()
-        r_all_data = {"nb_results": 0, "ids": []}
-        for cmd in r_all.json():
-            if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                res = cmd.get("results", {})
-                r_all_data = {
-                    "nb_results": res.get("nb_results", 0),
-                    "ids": [str(it.get("id","")) for it in res.get("items", [])],
-                    "nb_items": len(res.get("items", [])),
-                }
-        print(f"  nb={r_all_data['nb_results']} ids={r_all_data['ids'][:5]}")
-        output["tests"]["all_ligues"] = r_all_data
-    except Exception as e:
-        print(f"  Erreur: {e}")
-        output["tests"]["all_ligues"] = {"error": str(e)}
-    time.sleep(0.4)
-
-    # Test 4 : sans cbrappel[] du tout (recherche_type=ligue seul)
-    print("\n[4] Ligue sans cbrappel (recherche_type=ligue seul) page 0...")
-    r_no_cb = get_page(session, fbid, {"recherche_type": "ligue"}, 0)
-    print(f"  nb={r_no_cb.get('nb_results')} ids={r_no_cb.get('ids', [])[:5]}")
-    output["tests"]["ligue_sans_cbrappel"] = r_no_cb
-
-    # Conclusion
-    if pct > 80:
-        conclusion = "GLOBAL: IDF et CORSE retournent ~memes resultats → une seule requete suffit"
-        approach   = "single_global"
-    else:
-        conclusion = "DISTINCT: IDF et CORSE ont des resultats differents → approche par ligue necessaire"
-        approach   = "per_ligue"
-
-    output["conclusion"] = conclusion
-    output["recommended_approach"] = approach
-
-    nb_all = output["tests"].get("all_ligues", {}).get("nb_results", 0)
-    nb_idf = output["tests"].get("idf_page0", {}).get("nb_results", 0)
-    nb_cor = output["tests"].get("corse_page0", {}).get("nb_results", 0)
     print(f"\n=== RÉSUMÉ ===")
-    print(f"IDF nb={nb_idf} | CORSE nb={nb_cor} | ALL nb={nb_all}")
-    print(f"Chevauchement IDF/CORSE : {pct:.0f}%")
-    print(f"Approche recommandée : {approach}")
-    print(f"Conclusion : {conclusion}")
+    print(f"Requêtes AJAX totales capturées : {len(res.get('ajax_requests', []))}")
+    print(f"Params submit interceptés : {'OUI' if res.get('intercepted_submit_params') else 'NON'}")
+    print(f"nb_results > 100 trouvé : {res.get('intercepted_submit_response_nb', 'NON')}")
+    print(f"Comité checkboxes trouvés : {len(res.get('comite_checkboxes_found', []))}")
+    print(f"Requêtes après submit : {len(res.get('post_submit_ajax_requests', []))}")
+
+    if res.get("intercepted_submit_params"):
+        print(f"\nPARAMÈTRES SUBMIT INTERCEPTÉS :")
+        print(res["intercepted_submit_params"][:800])
 
     os.makedirs("data", exist_ok=True)
     with open("data/diag_ligue.json", "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
+
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
     subprocess.run(["git", "add", "data/diag_ligue.json"], check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if diff.returncode != 0:
-        subprocess.run(["git", "commit", "-m", f"diag_ligue v11 overlap test [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
+        subprocess.run(["git", "commit", "-m", f"diag_ligue v12 comites [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC]"], check=True)
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Commit pushé.")
+
 
 if __name__ == "__main__":
     main()
