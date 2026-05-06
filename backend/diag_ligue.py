@@ -182,11 +182,7 @@ def main():
             time.sleep(0.3)
 
     print("\n=== Test 3 : toutes ligues en même temps ===")
-    all_ids_extra = {}
-    for lid, _ in LIGUES:
-        # requests encode les paramètres en lists automatiquement si on passe une list
-        # Mais avec data=dict, cbrappel[]=XX doit être encodé différemment
-    # Utiliser une liste de tuples pour multi-value
+    # Utiliser une liste de tuples pour multi-value (requests gère les doublons de clés)
     all_ids_params_list = [("cbrappel[]", lid) for lid, _ in LIGUES]
     all_ids_params_list += [
         ("recherche_type", "ligue"),
