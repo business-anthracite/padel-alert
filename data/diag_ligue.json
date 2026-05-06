@@ -1,164 +1,654 @@
 {
-  "run_at": "2026-05-06T21:40:50Z",
-  "tests": {
-    "idf_page0": {
-      "nb_results": 10000,
-      "ids": [
-        "82554319",
-        "82550236",
-        "82600284",
-        "82458236",
-        "82567333",
-        "82567304",
-        "82479212",
-        "82494164",
-        "82540728",
-        "82391127",
-        "82450493",
-        "82470712",
-        "82493358",
-        "82500439",
-        "82542403",
-        "82490634",
-        "82536910",
-        "82528918",
-        "82612454",
-        "82612454",
-        "82533843",
-        "82544974",
-        "82534745",
-        "82554405",
-        "82557224",
-        "82557224",
-        "82564780",
-        "82564780",
-        "82636211",
-        "82554558"
-      ],
-      "nb_items": 30
+  "run_at": "2026-05-06T22:04:07Z",
+  "all_requests": [
+    {
+      "url": "https://tenup.fft.fr/recherche/tournois",
+      "method": "GET",
+      "post_data": ""
     },
-    "corse_page0": {
-      "nb_results": 10000,
-      "ids": [
-        "82554319",
-        "82550236",
-        "82600284",
-        "82458236",
-        "82567333",
-        "82567304",
-        "82479212",
-        "82494164",
-        "82540728",
-        "82391127",
-        "82450493",
-        "82470712",
-        "82493358",
-        "82500439",
-        "82542403",
-        "82490634",
-        "82536910",
-        "82528918",
-        "82612454",
-        "82612454",
-        "82533843",
-        "82544974",
-        "82534745",
-        "82554405",
-        "82557224",
-        "82557224",
-        "82564780",
-        "82564780",
-        "82636211",
-        "82554558"
-      ],
-      "nb_items": 30
+    {
+      "url": "https://tenup.queue-it.net/?c=tenup&e=tenupprod&ver=javascript-4.2.2&cver=10&man=tenup%20prod&enqueuetoken=eyJ0eXAiOiJRVDEiLCJlbmMiOiJBRVMyNTYiLCJpc3MiOjE3NzgxMDUwNDg1MDcsImV4cCI6MTc3ODEwNTI4ODUwNywidGkiOiJiNDFlNzZjZi1iMzFkLTQwMzMtOGIwMS0xZTM2YTc3NTUyYWEiLCJjIjoidGVudXAiLCJlIjoidGVudXBwcm9kIiwiaXAiOiI2NC4yMzYuMTQwLjIwOSJ9.UbFJpbrnXOEwdmOqClrICQ.He1Ts4Gs8wbq2u64zOyvNMjjc5FrFKnI3YcKq1yI4c4&t=https%3A%2F%2Ftenup.fft.fr%2Frecherche%2Ftournois&kupver=cloudfront-4.2.3",
+      "method": "GET",
+      "post_data": ""
     },
-    "all_ligues": {
-      "nb_results": 10000,
-      "ids": [
-        "82554319",
-        "82550236",
-        "82600284",
-        "82458236",
-        "82567333",
-        "82567304",
-        "82494164",
-        "82479212",
-        "82540728",
-        "82391127",
-        "82450493",
-        "82470712",
-        "82493358",
-        "82500439",
-        "82542403",
-        "82490634",
-        "82536910",
-        "82528918",
-        "82612454",
-        "82612454",
-        "82533843",
-        "82544974",
-        "82534745",
-        "82554405",
-        "82557224",
-        "82557224",
-        "82564780",
-        "82564780",
-        "82636211",
-        "82554558"
-      ],
-      "nb_items": 30
+    {
+      "url": "https://tenup.queue-it.net/?c=tenup&e=tenupprod&t=https%3A%2F%2Ftenup.fft.fr%2Frecherche%2Ftournois&cid=fr-FR&enqueuetoken=eyJ0eXAiOiJRVDEiLCJlbmMiOiJBRVMyNTYiLCJpc3MiOjE3NzgxMDUwNDg1MDcsImV4cCI6MTc3ODEwNTI4ODUwNywidGkiOiJiNDFlNzZjZi1iMzFkLTQwMzMtOGIwMS0xZTM2YTc3NTUyYWEiLCJjIjoidGVudXAiLCJlIjoidGVudXBwcm9kIiwiaXAiOiI2NC4yMzYuMTQwLjIwOSJ9.UbFJpbrnXOEwdmOqClrICQ.He1Ts4Gs8wbq2u64zOyvNMjjc5FrFKnI3YcKq1yI4c4&tsr=1778105108&tsh=b53f49ae993f343df1f9fe61277069876438dfb4fe047054ead9fafe4283d3dd",
+      "method": "GET",
+      "post_data": ""
     },
-    "ligue_sans_cbrappel": {
-      "nb_results": 10000,
-      "ids": [
-        "82554319",
-        "82550236",
-        "82600284",
-        "82458236",
-        "82567333",
-        "82567304",
-        "82479212",
-        "82494164",
-        "82540728",
-        "82391127",
-        "82450493",
-        "82470712",
-        "82493358",
-        "82500439",
-        "82542403",
-        "82490634",
-        "82536910",
-        "82528918",
-        "82612454",
-        "82612454",
-        "82533843",
-        "82544974",
-        "82534745",
-        "82554405",
-        "82557224",
-        "82557224",
-        "82564780",
-        "82564780",
-        "82636211",
-        "82554558"
-      ],
-      "nb_items": 30
+    {
+      "url": "https://tenup.fft.fr/recherche/tournois?queueittoken=e_tenupprod~ts_1778105228~ce_true~rt_safetynet~h_dfff0492c5d86e48bf96f9e65f769a813e044c341f67c37d5c7fb2fa3b00b2a5",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/recherche/tournois",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css___eT0SOsQL0P8aN6kNPrOOV0E2_JRBL76oyyU21mVngY___uCSq0ysHNy9q3JdVaGYtpjs3-IeMKxEW9C-OR7AuBA__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__TmAtwd2pBQG364gsv2vfrHq0MsmeQGKZhdw92Msh4Ok__0WJxnfXG9dEe_18T8nuyUlG79tk2f1f5oSm81BmvVKc__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__NY2kleEb6H6zzU4P290zDg8rWdvXzSmUYH6kx-EJiag__jMnl_r9xp6M0qiMjwL2rZ-DFeFAdVqxoWN3Tte5-2Zs__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__rgBIsYLmVHtuEc4AIJlOokAhdfHh1WyAdDBxmQPA_VA__tz6MruuGXv_kMDghI-aMarJMDU8NAEpXoZYIUaeY-nM__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__wDQFbWMPUrFcfuCzu1mY-4cGbTHzeyDIRWVnWtPXoGI__sgjaKgJOpLuSrj0DLl785AQcbJQf4SdIsRm8L_OVdkI__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__M6lHnTJF5a0GVsSmtMwavANtFreMQ3UPDAEZuSHnCQE__37VqH4i-Xc_dilUFoOomfgngNLj6-JQUEY8D8jgar7I__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__g5GIP7XdtWoqISc42EgGAO6QIIMUPok4QBo9gYGYBnY__g_6EwfibJ25Ai61Q_tLRz0ZOe1e3jdW4hJIGR5Ur5xM__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__s-sNEa9iZ8727hjweboVsaHvioRjDqXoQJgTzC0sBSQ__FIA0lkS49NKStPHDMQtFVf6zj0q_2rVgb5uUmfCyZC4__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__CXgzfUU6nFYgu40FE6xhBYFHW-zAhD3q5JfOEW72UdM__uyKoRhLGRzTXE080Qe4eo2m-xUJ848i0TpBjxS1h5Uo__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__4EFOesQDnbpdzV8CR2MJtyNwGKZeKi69bgQ1YqAH8-0__iL3qsEo2Vn-FL6Ukilhq9r1IIvPhBY7-o9F51bwJBOU__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__MbT54aTWrlVfdCR8A9WGlbc94Yu73-OJ5GLCqfAX730__YTV5vE5N0n3ovqO3een2-dkRC1pkQwZ2IKae_rIiybY__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__mhZMss6NXdyKPvSD2b3NPYpjYErhlyqNkehJfPURLPE__7yMW2jbzMdTZ2uCvZj-tVvx9bUyLP_nX0bm-4Vz2UcM__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__qlIX3R1XJPeE3eQ84a33s0d484EfsTekQEadZj8z-T8__2T-JL8eN95YUHqW5xuilclL0pZM8Ik5_afiohlTPMLk__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__zrO4nw4N12S22xbaP55whvRwkoMhQcTh8UNIDCin_ZA__9V6lSTLgJ78rYsGKXxh7ovxvDARa9OlvgHEDkHAIgzI__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__LFe0q-b2yHkX9i8PDZ22m1t87AdoxYVosGFmVnYHFNE__cxEexxfzPgdFcgMBYHL_SWom3-Nl7Is-4y3avJM_kUc__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__zXfkzmR1_Vk1TIYecGbi6BiJLbSktKLeyJtfz4nuNOo__z19KC4_N2ToOqA-JidLa67gxmnyksLzcbw29i_-mMQc__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__7Do1CsnFDDLPV4Bw2qDuketPTqtgHWNj-ofIXmixJWQ__nkL88rDpIO5X_yx6EySyWveye-7Z9UARb0YXhmErE6g__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__isMr75fEvWkGO8KB_Q9d4N-YyqdabC82uB0lkorVyZA__xn1YyZo1XcnRn2j0yZ_5XToJqB__zOYAQtOVtTyqSxA__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__HgVIAorQ525onxJY2dyEG-c9pqUQqZVOeZurRZoR8lI__yZssYf-Iuqr61yCerg_Cb21w4jNJpsUICmYCZdbCI0w__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__akaSaa7mV95bfBbUJZzqPaY5IUhnl8ylMIdER3gfjLc__44H1Uj1VTBg0RXT08nfYtbbRoKnFLz545w0kbRZVSs8__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__SXLtXTmQfusziAAOw8hA8XKk03F42vF5iTg3Vx85j74__MXZejBZXX2BQOfbgKgcEyCpGVuYR3ATkI0jJSahIlos__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__02ItYq67vChlYZGS1vmVvhvf0FA-DszJh29bK8XQZOM__7nUjAybUh4C9Az6yRkG5Kf2KSgO9WFGs_oiSMwUTjfs__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__h3b9OoguOPHrrXMW5_w2TodsuFe29cLcjH14MIVKVi0__-fs90fhtLOnVKK1nHLFAcwUsvLluzv0Bu2CS_X2A7ws__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_css/css__Gxc7Q9X9WDyFSyrZ9yT_o5N7G8-NgZn902hnkgsVT68__ngrzi3uFi-m52YrAGzXi0YcqAY0sQ8mQ-N-9zXxHe3Q__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.css",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_js/js__KdjuCfptnqFNNr2ZUAN-rbd235TSEUnM4J9hk0ovu5s__ag3e40OkdcVPs0v9MZXoW0QnXakNC7pQGKH-zMHkgkE__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.js",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_js/js__4ASLWvvRO5lGz6zVGJ7JeSv6fvhsR30tWEkjBYtPFPo__fbpNiBPm303DyCl9UWIVihYzm72Bx-0qiFI9C8CQA8I__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.js",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_js/js__QCizBHr4-RgOtBdSiXf9rsUs7cODV8g1fTLHFTit2As__4KnyG6Dfiv_SlN0UDhoDla50a5-y5XD_dgwMPL-VZNs__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.js",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_js/js__j_PbrEEwC6VRzvV5-oVdwv5wBmrqJF5zWEVm4KU9brY__I8JDz-ypGkuATbxdQ9ioJHI8PB4ZXWcJchyp2wnCL9U__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.js",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/logo.svg",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/branding/footer.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/bnp.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/intersport_1.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/vista.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/wilson_0.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_js/js__1TzohXOWZuwmdeY_1gD1q36xOq3VO25Wdll-b0WUujo__uJnjQZPFVT6gFqdPfdu2WZT9RA-y0z1jpOgkMlYncHE__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.js",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/advagg_js/js__i11V-7AETPhfL9YzRpXBpECwVkYyQ_ahu2eHxES_mK0__S79mhsO6q7fWONLNt9XSEZx-JmiQeAEtuPkuVxIEjpY__HmOqssqFE1CQmOvc2dlR6y8e5f4_lQDTp8LkqQlu2m0.js",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/80ac3f19ac6c190775f9.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/a19840883caeff76cd36.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/default/files/actency_backgrounds/propositions_0001_02.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/9b3bed9157cd7144e118.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/d00b65d5debc6f91ea9b.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/29703e176cf2b447b507.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/89dfeee909104614b4a6.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/ea8d00a07cb4b5960854.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/f492a7533d3c560581ee.ttf?c3qzkw",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/cebade339c3e977c9fdc.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/e7a21b87d4d14eeb86ae.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/actency-api/rebuild-ajax-form/recherche_tournois_form",
+      "method": "POST",
+      "post_data": "form_build_id=form-znykXOBujoqVLV2N01SwMS_-Pz607ALkbK13OtgKhps"
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/modules/contrib/jquery_update/replace/ui/themes/base/minified/images/ui-bg_flat_75_ffffff_40x100.png",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://eu-cdn.acsbapp.com/config/tenup.fft.fr/config.json",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/96dfd7f9e9767750fa74.svg",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/6b9c0a613e3821622987.woff2",
+      "method": "GET",
+      "post_data": ""
+    },
+    {
+      "url": "https://tenup.fft.fr/sites/all/themes/met/public/css/4a1baaf89c26bd262a1b.woff2",
+      "method": "GET",
+      "post_data": ""
     }
-  },
-  "conclusion": "GLOBAL: IDF et CORSE retournent ~memes resultats → une seule requete suffit",
-  "overlap_pct": 100.0,
-  "overlap_ids": [
-    "82533843",
-    "82636211",
-    "82490634",
-    "82540728",
-    "82536910",
-    "82493358",
-    "82600284",
-    "82391127",
-    "82542403",
-    "82567304"
   ],
-  "recommended_approach": "single_global"
+  "ajax_requests": [],
+  "intercepted_submit_params": null,
+  "intercepted_submit_response_nb": null,
+  "error": null,
+  "fbid": "form-znykXOBujoqVLV2N01SwMS_-Pz607ALkbK13OtgKhps",
+  "comite_checkboxes_found": [
+    {
+      "id": "edit-epreuve-sm",
+      "name": "epreuve[SM]",
+      "value": "SM",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-epreuve-sd",
+      "name": "epreuve[SD]",
+      "value": "SD",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-epreuve-dx",
+      "name": "epreuve[DX]",
+      "value": "DX",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-epreuve-dm",
+      "name": "epreuve[DM]",
+      "value": "DM",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-epreuve-dd",
+      "name": "epreuve[DD]",
+      "value": "DD",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-708096979890956599100",
+      "name": "categorie_age[70|80|96|97|98|90|95|65|99|100]",
+      "value": "70|80|96|97|98|90|95|65|99|100",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-110",
+      "name": "categorie_age[110]",
+      "value": "110",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-120",
+      "name": "categorie_age[120]",
+      "value": "120",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-125",
+      "name": "categorie_age[125]",
+      "value": "125",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-130",
+      "name": "categorie_age[130]",
+      "value": "130",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-140",
+      "name": "categorie_age[140]",
+      "value": "140",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-145",
+      "name": "categorie_age[145]",
+      "value": "145",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-160",
+      "name": "categorie_age[160]",
+      "value": "160",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-180",
+      "name": "categorie_age[180]",
+      "value": "180",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-200",
+      "name": "categorie_age[200]",
+      "value": "200",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-350",
+      "name": "categorie_age[350]",
+      "value": "350",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-400",
+      "name": "categorie_age[400]",
+      "value": "400",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-450",
+      "name": "categorie_age[450]",
+      "value": "450",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-500",
+      "name": "categorie_age[500]",
+      "value": "500",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-550",
+      "name": "categorie_age[550]",
+      "value": "550",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-600",
+      "name": "categorie_age[600]",
+      "value": "600",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-650",
+      "name": "categorie_age[650]",
+      "value": "650",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-700",
+      "name": "categorie_age[700]",
+      "value": "700",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-750",
+      "name": "categorie_age[750]",
+      "value": "750",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-categorie-age-800",
+      "name": "categorie_age[800]",
+      "value": "800",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-type-t",
+      "name": "type[T]",
+      "value": "T",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-type-c",
+      "name": "type[C]",
+      "value": "C",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-tradi",
+      "name": "famille_tournois[TRADI]",
+      "value": "TRADI",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-multi",
+      "name": "famille_tournois[MULTI]",
+      "value": "MULTI",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-tmc-d",
+      "name": "famille_tournois[TMC_D]",
+      "value": "TMC_D",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-tmc-m",
+      "name": "famille_tournois[TMC_M]",
+      "value": "TMC_M",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-court-adul",
+      "name": "famille_tournois[COURT_ADUL]",
+      "value": "COURT_ADUL",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-tradi-v",
+      "name": "famille_tournois[TRADI_V]",
+      "value": "TRADI_V",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-multi-v",
+      "name": "famille_tournois[MULTI_V]",
+      "value": "MULTI_V",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-galaxie-o",
+      "name": "famille_tournois[GALAXIE_O]",
+      "value": "GALAXIE_O",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-galaxie-v",
+      "name": "famille_tournois[GALAXIE_V]",
+      "value": "GALAXIE_V",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-cngt",
+      "name": "famille_tournois[CNGT]",
+      "value": "CNGT",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-famille-tournois-ntc",
+      "name": "famille_tournois[NTC]",
+      "value": "NTC",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-surface-b-pil",
+      "name": "surface[B_PIL]",
+      "value": "B_PIL",
+      "checked": false,
+      "class": "checkboxesradios-square form-checkbox"
+    },
+    {
+      "id": "edit-surface-dur-",
+      "name": "surface[DUR  ]",
+      "value": "DUR  ",
+      "checked": false,
+      "class": "checkboxesradios-square form-checkbox"
+    },
+    {
+      "id": "edit-surface-gazon",
+      "name": "surface[GAZON]",
+      "value": "GAZON",
+      "checked": false,
+      "class": "checkboxesradios-square form-checkbox"
+    },
+    {
+      "id": "edit-surface-autre",
+      "name": "surface[AUTRE]",
+      "value": "AUTRE",
+      "checked": false,
+      "class": "checkboxesradios-square form-checkbox"
+    },
+    {
+      "id": "edit-limitation-classements",
+      "name": "limitation_classements",
+      "value": "1",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10060",
+      "name": "classements[10060]",
+      "value": "10060",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10063",
+      "name": "classements[10063]",
+      "value": "10063",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10064",
+      "name": "classements[10064]",
+      "value": "10064",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10065",
+      "name": "classements[10065]",
+      "value": "10065",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10070",
+      "name": "classements[10070]",
+      "value": "10070",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10080",
+      "name": "classements[10080]",
+      "value": "10080",
+      "checked": false,
+      "class": "form-checkbox"
+    },
+    {
+      "id": "edit-classements-10090",
+      "name": "classements[10090]",
+      "value": "10090",
+      "checked": false,
+      "class": "form-checkbox"
+    }
+  ],
+  "post_submit_ajax_requests": [],
+  "dom_after_suivant_excerpt": "<div id=\"app\" style=\"display: block !important;\"><div class=\"wrapper-creneau-modal\"><div id=\"overlay-modal-creneau\" style=\"display: block !important;\"><div class=\"display-modal-creneau\"><div role=\"document\" class=\"modal-dialog\"><div class=\"modal-content\"><div class=\"modal-header\"><button type=\"button\" data-dismiss=\"modal\" aria-label=\"Close\" class=\"close\"><span aria-hidden=\"true\" class=\"meticon-times\"></span></button> <h4 class=\"modal-title\">\n      Sélectionnez une ou plusieurs ligues\n    </h4></div> <div class=\"modal-body modale-ligue\"><!----> <div class=\"overflow-modal\"><div class=\"overflow-ligues-inner\"><div class=\"row\"><div class=\"col-xs-12 col-sm-6\"><div class=\"form-item form-type-checkbox\"><input id=\"all_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"all_cbrappel\">Toutes les ligues</label></div> <div class=\"form-item form-type-checkbox\"><input id=\"50_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"50_cbrappel\">AUVERGNE RHONE-ALPES</label></div><div class=\"form-item form-type-checkbox\"><input id=\"51_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"51_cbrappel\">BOURGOGNE FRANCHE COMTE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"52_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"52_cbrappel\">BRETAGNE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"53_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"53_cbrappel\">CENTRE VAL DE LOIRE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"54_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"54_cbrappel\">CORSE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"55_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"55_cbrappel\">GRAND EST</label></div><div class=\"form-item form-type-checkbox\"><input id=\"63_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"63_cbrappel\">GUADELOUPE ST MARTIN ST BARTH</label></div><div class=\"form-item form-type-checkbox\"><input id=\"64_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"64_cbrappel\">GUYANE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"56_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"56_cbrappel\">HAUTS DE FRANCE</label></div></div> <div class=\"col-xs-12 col-sm-6\"><div class=\"form-item form-type-checkbox\"><input id=\"57_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"57_cbrappel\">ILE DE FRANCE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"65_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"65_cbrappel\">MARTINIQUE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"58_cbrappel\" type=\"checkbox\" style=\"width: 19px; height: 19px;\"> <label for=\"58_cbrappel\">NORMANDIE</label></div><div class=\"form-item form-type-checkbox\"><input id=\"59_cbrappel\" type=\""
 }
