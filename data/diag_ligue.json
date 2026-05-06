@@ -1,61 +1,64 @@
 {
-  "run_at": "2026-05-06T22:27:42Z",
+  "run_at": "2026-05-06T22:33:08Z",
   "tests": [
     {
-      "label": "ville+critères+_DIST_ page0",
+      "label": "ligue_fresh_fbid_0",
       "nb": 0,
-      "new_unique": 0,
-      "overlap": 0
+      "new_ids": 0,
+      "total_unique": 0
     },
     {
-      "label": "ville+critères+_DIST_ page1",
-      "nb": 137,
-      "new_unique": 30,
-      "overlap": 0
-    },
-    {
-      "label": "ville+critères+_DIST_ page2",
-      "nb": 137,
-      "new_unique": 0,
-      "overlap": 30
-    },
-    {
-      "label": "ville+dateFin asc page0",
-      "nb": 137,
-      "new_unique": 30
-    },
-    {
-      "label": "ville+dateFin asc page1",
-      "nb": 137,
-      "new_unique": 0
-    },
-    {
-      "label": "ligue+dateFin asc page0",
+      "label": "ligue_fresh_fbid_1",
       "nb": 1147,
-      "new_unique": 30
+      "new_ids": 30,
+      "total_unique": 30
     },
     {
-      "label": "ligue+dateFin asc page1",
+      "label": "ligue_fresh_fbid_2",
       "nb": 1147,
-      "new_unique": 0
+      "new_ids": 0,
+      "total_unique": 30
     },
     {
-      "label": "ville sans critères page0",
-      "nb": 1848,
-      "new_unique": 16
+      "label": "ligue_fresh_fbid_3",
+      "nb": 1147,
+      "new_ids": 0,
+      "total_unique": 30
     },
     {
-      "label": "ville sans critères page1",
-      "nb": 1848,
-      "new_unique": 0
+      "label": "ligue_fresh_fbid_4",
+      "nb": 1147,
+      "new_ids": 0,
+      "total_unique": 30
     },
     {
-      "label": "ville sans critères page2",
-      "nb": 1848,
-      "new_unique": 0
+      "label": "ville_fresh_fbid_0",
+      "nb": 137,
+      "new_ids": 30
+    },
+    {
+      "label": "ville_fresh_fbid_1",
+      "nb": 137,
+      "new_ids": 0
+    },
+    {
+      "label": "ville_fresh_fbid_2",
+      "nb": 137,
+      "new_ids": 0
+    },
+    {
+      "label": "ville_fresh_fbid_3",
+      "nb": 137,
+      "new_ids": 0
+    },
+    {
+      "label": "ville_fresh_fbid_4",
+      "nb": 137,
+      "new_ids": 0
     }
   ],
-  "conclusion": "ville+critères pag=KO, ville sans critères pag=KO",
-  "ville_avec_criteres_pagination": false,
-  "ville_sans_criteres_pagination": false
+  "conclusion": "ligue_fresh_fbid_unique_5=30, ligue_fresh_fbid_unique_40=N/A, sampling_works=False",
+  "random_sampling_unique_5": 30,
+  "random_sampling_works": false,
+  "ville_sampling_unique_5": 30
 }
