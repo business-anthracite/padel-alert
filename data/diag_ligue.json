@@ -1,0 +1,1030 @@
+{
+  "run_at": "2026-05-06T05:33:59Z",
+  "discovery": {
+    "form_fields": [
+      {
+        "name": "recherche_type",
+        "id": "edit-recherche-type-ville",
+        "type": "radio",
+        "tag": "input",
+        "visible": true
+      },
+      {
+        "name": "recherche_type",
+        "id": "edit-recherche-type-club",
+        "type": "radio",
+        "tag": "input",
+        "visible": true
+      },
+      {
+        "name": "recherche_type",
+        "id": "edit-recherche-type-ligue",
+        "type": "radio",
+        "tag": "input",
+        "visible": true
+      },
+      {
+        "name": "ville[autocomplete][country]",
+        "id": "edit-ville-autocomplete-country",
+        "type": "select-one",
+        "tag": "select",
+        "visible": false
+      },
+      {
+        "name": "ville[autocomplete][textfield]",
+        "id": "autocomplete-custom-input",
+        "type": "search",
+        "tag": "input",
+        "visible": true
+      },
+      {
+        "name": "ville[autocomplete][value_container][value_field]",
+        "id": "edit-ville-autocomplete-value-container-value-field",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "ville[autocomplete][value_container][label_field]",
+        "id": "edit-ville-autocomplete-value-container-label-field",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "ville[autocomplete][value_container][lat_field]",
+        "id": "",
+        "type": "hidden",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "ville[autocomplete][value_container][lng_field]",
+        "id": "",
+        "type": "hidden",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "ville[distance][value_field]",
+        "id": "",
+        "type": "hidden",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "club[autocomplete][textfield]",
+        "id": "autocomplete-custom-input--2",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "club[autocomplete][value_container][value_field]",
+        "id": "edit-club-autocomplete-value-container-value-field",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "club[autocomplete][value_container][label_field]",
+        "id": "edit-club-autocomplete-value-container-label-field",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "pratique",
+        "id": "edit-pratique-tennis",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "pratique",
+        "id": "edit-pratique-padel",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "pratique",
+        "id": "edit-pratique-beach",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "pratique",
+        "id": "edit-pratique-pickle",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "date[start]",
+        "id": "date-range-custom-input-start",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "date[end]",
+        "id": "date-range-custom-input-end",
+        "type": "text",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "epreuve[SM]",
+        "id": "edit-epreuve-sm",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "epreuve[SD]",
+        "id": "edit-epreuve-sd",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "epreuve[DX]",
+        "id": "edit-epreuve-dx",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "epreuve[DM]",
+        "id": "edit-epreuve-dm",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "epreuve[DD]",
+        "id": "edit-epreuve-dd",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[70|80|96|97|98|90|95|65|99|100]",
+        "id": "edit-categorie-age-708096979890956599100",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[110]",
+        "id": "edit-categorie-age-110",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[120]",
+        "id": "edit-categorie-age-120",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[125]",
+        "id": "edit-categorie-age-125",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[130]",
+        "id": "edit-categorie-age-130",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[140]",
+        "id": "edit-categorie-age-140",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[145]",
+        "id": "edit-categorie-age-145",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[160]",
+        "id": "edit-categorie-age-160",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[180]",
+        "id": "edit-categorie-age-180",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[200]",
+        "id": "edit-categorie-age-200",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[350]",
+        "id": "edit-categorie-age-350",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[400]",
+        "id": "edit-categorie-age-400",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[450]",
+        "id": "edit-categorie-age-450",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[500]",
+        "id": "edit-categorie-age-500",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[550]",
+        "id": "edit-categorie-age-550",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[600]",
+        "id": "edit-categorie-age-600",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[650]",
+        "id": "edit-categorie-age-650",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[700]",
+        "id": "edit-categorie-age-700",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[750]",
+        "id": "edit-categorie-age-750",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "categorie_age[800]",
+        "id": "edit-categorie-age-800",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "type[T]",
+        "id": "edit-type-t",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "type[C]",
+        "id": "edit-type-c",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "tournois_interne",
+        "id": "edit-tournois-interne-0",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "tournois_interne",
+        "id": "edit-tournois-interne-1",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[TRADI]",
+        "id": "edit-famille-tournois-tradi",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[MULTI]",
+        "id": "edit-famille-tournois-multi",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[TMC_D]",
+        "id": "edit-famille-tournois-tmc-d",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[TMC_M]",
+        "id": "edit-famille-tournois-tmc-m",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[COURT_ADUL]",
+        "id": "edit-famille-tournois-court-adul",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[TRADI_V]",
+        "id": "edit-famille-tournois-tradi-v",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[MULTI_V]",
+        "id": "edit-famille-tournois-multi-v",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[GALAXIE_O]",
+        "id": "edit-famille-tournois-galaxie-o",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[GALAXIE_V]",
+        "id": "edit-famille-tournois-galaxie-v",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[CNGT]",
+        "id": "edit-famille-tournois-cngt",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "famille_tournois[NTC]",
+        "id": "edit-famille-tournois-ntc",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "surface[B_PIL]",
+        "id": "edit-surface-b-pil",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "surface[DUR  ]",
+        "id": "edit-surface-dur-",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "surface[GAZON]",
+        "id": "edit-surface-gazon",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "surface[AUTRE]",
+        "id": "edit-surface-autre",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "inscription_ligne",
+        "id": "edit-inscription-ligne-0",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "inscription_ligne",
+        "id": "edit-inscription-ligne-1",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "paiement_ligne",
+        "id": "edit-paiement-ligne-0",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "paiement_ligne",
+        "id": "edit-paiement-ligne-1",
+        "type": "radio",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "limitation_classements",
+        "id": "edit-limitation-classements",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10060]",
+        "id": "edit-classements-10060",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10063]",
+        "id": "edit-classements-10063",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10064]",
+        "id": "edit-classements-10064",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10065]",
+        "id": "edit-classements-10065",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10070]",
+        "id": "edit-classements-10070",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10080]",
+        "id": "edit-classements-10080",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10090]",
+        "id": "edit-classements-10090",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10100]",
+        "id": "edit-classements-10100",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10110]",
+        "id": "edit-classements-10110",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10120]",
+        "id": "edit-classements-10120",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10130]",
+        "id": "edit-classements-10130",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10140]",
+        "id": "edit-classements-10140",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10150]",
+        "id": "edit-classements-10150",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10160]",
+        "id": "edit-classements-10160",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10170]",
+        "id": "edit-classements-10170",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10180]",
+        "id": "edit-classements-10180",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10190]",
+        "id": "edit-classements-10190",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10200]",
+        "id": "edit-classements-10200",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10210]",
+        "id": "edit-classements-10210",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10220]",
+        "id": "edit-classements-10220",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10230]",
+        "id": "edit-classements-10230",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10240]",
+        "id": "edit-classements-10240",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10250]",
+        "id": "edit-classements-10250",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10260]",
+        "id": "edit-classements-10260",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10270]",
+        "id": "edit-classements-10270",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "classements[10247]",
+        "id": "edit-classements-10247",
+        "type": "checkbox",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "page",
+        "id": "",
+        "type": "hidden",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "sort",
+        "id": "edit-sort",
+        "type": "select-one",
+        "tag": "select",
+        "visible": false
+      },
+      {
+        "name": "form_build_id",
+        "id": "",
+        "type": "hidden",
+        "tag": "input",
+        "visible": false
+      },
+      {
+        "name": "form_id",
+        "id": "",
+        "type": "hidden",
+        "tag": "input",
+        "visible": false
+      }
+    ],
+    "ligue_select_name": null,
+    "ligue_options": [],
+    "comite_select_name": null,
+    "comite_options_sample": [],
+    "fbid": "form-GqogAjJHduAbL3DJOWaR3ZHvqxFQupvLp9u28_IP2B4",
+    "html_selects": [
+      {
+        "tag": "select",
+        "name": "ville[autocomplete][country]",
+        "id": "edit-ville-autocomplete-country",
+        "type": "select-one",
+        "value": "fr",
+        "visible": false,
+        "options": [
+          {
+            "v": "fr",
+            "t": "France métropolitaine"
+          },
+          {
+            "v": "gp",
+            "t": "Guadeloupe"
+          },
+          {
+            "v": "gf",
+            "t": "Guyane"
+          },
+          {
+            "v": "re",
+            "t": "La Réunion"
+          },
+          {
+            "v": "mq",
+            "t": "Martinique"
+          },
+          {
+            "v": "yt",
+            "t": "Mayotte"
+          },
+          {
+            "v": "nc",
+            "t": "Nouvelle-Calédonie"
+          },
+          {
+            "v": "pf",
+            "t": "Polynésie française"
+          },
+          {
+            "v": "bl",
+            "t": "Saint-Barthélemy"
+          },
+          {
+            "v": "mf",
+            "t": "Saint-Martin"
+          },
+          {
+            "v": "pm",
+            "t": "Saint-Pierre-et-Miquelon"
+          },
+          {
+            "v": "tf",
+            "t": "Terres australes et antarctiques françaises"
+          },
+          {
+            "v": "wf",
+            "t": "Wallis-et-Futuna"
+          }
+        ]
+      },
+      {
+        "tag": "select",
+        "name": "sort",
+        "id": "edit-sort",
+        "type": "select-one",
+        "value": "_DIST_",
+        "visible": false,
+        "options": [
+          {
+            "v": "_DIST_",
+            "t": "Tri par distance"
+          },
+          {
+            "v": "dateDebut asc",
+            "t": "Tri par date de début"
+          },
+          {
+            "v": "dateFin asc",
+            "t": "Tri par date de fin"
+          }
+        ]
+      }
+    ],
+    "html_inputs_recherche_type": [
+      {
+        "tag": "input",
+        "name": "recherche_type",
+        "id": "edit-recherche-type-ville",
+        "type": "radio",
+        "value": "ville",
+        "visible": true,
+        "options": null
+      },
+      {
+        "tag": "input",
+        "name": "recherche_type",
+        "id": "edit-recherche-type-club",
+        "type": "radio",
+        "value": "club",
+        "visible": true,
+        "options": null
+      },
+      {
+        "tag": "input",
+        "name": "recherche_type",
+        "id": "edit-recherche-type-ligue",
+        "type": "radio",
+        "value": "ligue",
+        "visible": true,
+        "options": null
+      }
+    ],
+    "all_input_names": [
+      "recherche_type",
+      "recherche_type",
+      "recherche_type",
+      "ville[autocomplete][country]",
+      "ville[autocomplete][textfield]",
+      "ville[autocomplete][value_container][value_field]",
+      "ville[autocomplete][value_container][label_field]",
+      "ville[autocomplete][value_container][lat_field]",
+      "ville[autocomplete][value_container][lng_field]",
+      "ville[distance][value_field]",
+      "club[autocomplete][textfield]",
+      "club[autocomplete][value_container][value_field]",
+      "club[autocomplete][value_container][label_field]",
+      "pratique",
+      "pratique",
+      "pratique",
+      "pratique",
+      "date[start]",
+      "date[end]",
+      "epreuve[SM]",
+      "epreuve[SD]",
+      "epreuve[DX]",
+      "epreuve[DM]",
+      "epreuve[DD]",
+      "categorie_age[70|80|96|97|98|90|95|65|99|100]",
+      "categorie_age[110]",
+      "categorie_age[120]",
+      "categorie_age[125]",
+      "categorie_age[130]",
+      "categorie_age[140]",
+      "categorie_age[145]",
+      "categorie_age[160]",
+      "categorie_age[180]",
+      "categorie_age[200]",
+      "categorie_age[350]",
+      "categorie_age[400]",
+      "categorie_age[450]",
+      "categorie_age[500]",
+      "categorie_age[550]",
+      "categorie_age[600]",
+      "categorie_age[650]",
+      "categorie_age[700]",
+      "categorie_age[750]",
+      "categorie_age[800]",
+      "type[T]",
+      "type[C]",
+      "tournois_interne",
+      "tournois_interne",
+      "famille_tournois[TRADI]",
+      "famille_tournois[MULTI]",
+      "famille_tournois[TMC_D]",
+      "famille_tournois[TMC_M]",
+      "famille_tournois[COURT_ADUL]",
+      "famille_tournois[TRADI_V]",
+      "famille_tournois[MULTI_V]",
+      "famille_tournois[GALAXIE_O]",
+      "famille_tournois[GALAXIE_V]",
+      "famille_tournois[CNGT]",
+      "famille_tournois[NTC]",
+      "surface[B_PIL]",
+      "surface[DUR  ]",
+      "surface[GAZON]",
+      "surface[AUTRE]",
+      "inscription_ligne",
+      "inscription_ligne",
+      "paiement_ligne",
+      "paiement_ligne",
+      "limitation_classements",
+      "classements[10060]",
+      "classements[10063]",
+      "classements[10064]",
+      "classements[10065]",
+      "classements[10070]",
+      "classements[10080]",
+      "classements[10090]",
+      "classements[10100]",
+      "classements[10110]",
+      "classements[10120]",
+      "classements[10130]",
+      "classements[10140]",
+      "classements[10150]",
+      "classements[10160]",
+      "classements[10170]",
+      "classements[10180]",
+      "classements[10190]",
+      "classements[10200]",
+      "classements[10210]",
+      "classements[10220]",
+      "classements[10230]",
+      "classements[10240]",
+      "classements[10250]",
+      "classements[10260]",
+      "classements[10270]",
+      "classements[10247]",
+      "page",
+      "sort",
+      "form_build_id",
+      "form_id"
+    ],
+    "form_html_excerpt": "<form class=\"blue-bg-container\" action=\"/recherche/tournois\" method=\"post\" id=\"recherche-tournois-form\" accept-charset=\"UTF-8\" style=\"display: block;\"><div><div class=\"wrapper-error\"><div class=\"error\" id=\"form-tournois-errors\" itemprop=\"error\"></div></div><div class=\"recherche-tournois-main clearfix\"><div class=\"recherche-tournois-main-filter clearfix\"><div class=\"do-radio-or-cb-type-button do-radio-or-cb-type-button-large\"><div class=\"form-item form-type-radios form-item-recherche-type\">\n  <label class=\"element-invisible\" for=\"edit-recherche-type\">Type de recherche </label>\n <div id=\"edit-recherche-type\" class=\"form-radios\"><div class=\"form-item form-type-radio form-item-recherche-type\">\n <input type=\"radio\" id=\"edit-recherche-type-ville\" name=\"recherche_type\" value=\"ville\" checked=\"checked\" class=\"form-radio\">  <label class=\"option\" for=\"edit-recherche-type-ville\">Ville </label>\n\n</div>\n<div class=\"form-item form-type-radio form-item-recherche-type\">\n <input type=\"radio\" id=\"edit-recherche-type-club\" name=\"recherche_type\" value=\"club\" class=\"form-radio\">  <label class=\"option\" for=\"edit-recherche-type-club\">Club </label>\n\n</div>\n<div class=\"form-item form-type-radio form-item-recherche-type\">\n <input type=\"radio\" id=\"edit-recherche-type-ligue\" name=\"recherche_type\" value=\"ligue\" class=\"form-radio\">  <label class=\"option\" for=\"edit-recherche-type-ligue\">Ligue </label>\n\n</div>\n</div>\n</div>\n</div><div id=\"edit-ville\" class=\"form-wrapper form-group\"><div class=\"form-item form-type-autocomplete-ville form-item-ville-autocomplete autocomplete-ville-processed\">\n  <label class=\"element-invisible\" for=\"edit-ville-autocomplete\">Renseigner votre ville </label>\n <div class=\"form-item form-type-select-icon form-item-ville-autocomplete-country\">\n <select class=\"autocomplete-ville-country-select select-icon form-select jquery-once-3-processed hide-elm\" id=\"edit-ville-autocomplete-country\" name=\"ville[autocomplete][country]\" style=\"display: none;\"><option value=\"fr\" selected=\"selected\">France métropolitaine</option><option value=\"gp\">Guadeloupe</option><option value=\"gf\">Guyane</option><option value=\"re\">La Réunion</option><option value=\"mq\">Martinique</option><option value=\"yt\">Mayotte</option><option value=\"nc\">Nouvelle-Calédonie</option><option value=\"pf\">Polynésie française</option><option value=\"bl\">Saint-Barthélemy</option><option value=\"mf\">Saint-Martin</option><option value=\"pm\">Saint-Pierre-et-Miquelon</option><option value=\"tf\">Terres australes et antarctiques françaises</option><option value=\"wf\">Wallis-et-Futuna</option></select><div class=\"listbox-area\"></div><div class=\"left-area\"><span id=\"label-edit-ville-autocomplete-country\" class=\"undefined\"></span><div class=\"wrapper-list-box\" id=\"wrapper-edit-ville-autocomplete-country\"><span data-refer=\"edit-ville-autocomplete-country\" data-form=\"recherche-tournois-form\" role=\"button\" tabindex=\"0\" class=\"label-list-box\" id=\"button-edit-ville-autocomplete-country\" aria-haspopup=\"listbox\" aria-labelledby=\"button-edit-ville-autocomplete-country label-edit-ville-autocomplete-country\">France métropolitaine</span><ul aria-activedescendant=\"option-edit-ville-autocomplete-country-fr\" data-form=\"recherche-tournois-form\" id=\"list-edit-ville-autocomplete-country\" tabindex=\"-1\" role=\"listbox\" aria-labelledby=\"label-edit-ville-autocomplete-country\" class=\"hide-elm\" data-refer=\"edit-ville-autocomplete-country\"><li data-refer=\"fr\" id=\"option-edit-ville-autocomplete-country-fr\" role=\"option\">France métropolitaine</li><li data-refer=\"gp\" id=\"option-edit-ville-autocomplete-country-gp\" role=\"option\">Guadeloupe</li><li data-refer=\"gf\" id=\"option-edit-ville-autocomplete-country-gf\" role=\"option\">Guyane</li><li data-refer=\"re\" id=\"option-edit-ville-autocomplete-country-re\" role=\"option\">La Réunion</li><li data-refer=\"mq\" id=\"option-edit-ville-autocomplete-country-mq\" role=\"option\">Martinique</li><li data-refer=\"yt\" id=\"option-edit-ville-autocomplete-country-yt\" role=\"option\">Mayotte</li><li data-refer=\"nc\" id=\"option-edit-ville-autocomplete-country-nc\" role=\"option\">Nouvelle-Calédonie</li><li data-refer=\"pf\" id=\"option-edit-ville-autocomplete-country-pf\" role=\"option\">Polynésie française</li><li data-refer=\"bl\" id=\"option-edit-ville-autocomplete-country-bl\" role=\"option\">Saint-Barthélemy</li><li data-refer=\"mf\" id=\"option-edit-ville-autocomplete-country-mf\" role=\"option\">Saint-Martin</li><li data-refer=\"pm\" id=\"option-edit-ville-autocomplete-country-pm\" role=\"option\">Saint-Pierre-et-Miquelon</li><li data-refer=\"tf\" id=\"option-edit-ville-autocomplete-country-tf\" role=\"option\">Terres australes et antarctiques françaises</li><li data-refer=\"wf\" id=\"option-edit-ville-autocomplete-country-wf\" role=\"option\">Wallis-et-Futuna</li></ul></div></div>\n</div>\n<div class=\"autocomplete-custom-container button-shown\">\n<input placeholder=\"Renseigner une ville / code postal\" class=\"autocomplete-custom-form autocomplete-ville-form form-control form-text recherche-tournois-processed init_autocomplete_custom-processed ui-autocomplete-input\" id=\"autocomplete-custom-input\" type=\"search\" name=\"ville[autocomplete][textfield]\" value=\"\" size=\"\" maxlength=\"128\" autocomplete=\"off\"><span role=\"status\" aria-live=\"polite\" class=\"ui-helper-hidden-accessible\"></span></div><button class=\"autocomplete-ville-geocoding-action btn form-submit\" type=\"submit\" id=\"edit-ville-autocomplete-button-geocoding\" name=\"op\" value=\"\"></button>\n<div class=\"autocomplete-custom-value-container form-wrapper form-group\" id=\"edit-ville-autocomplete-value-container\" style=\"display: none;\"><div class=\"form-item form-type-textfield form-item-ville-autocomplete-value-container-value-field\">\n <input class=\"autocomplete-custom-value-field form-control form-text\" type=\"text\" id=\"edit-ville-autocomplete-value-container-value-field\" name=\"ville[autocomplete][value_container][value_field]\" value=\"\" size=\"60\" maxlength=\"128\">\n</div>\n<div class=\"form-item form-type-textfield form-item-ville-autocomplete-value-container-label-field\">\n <input class=\"autocomplete-custom-label-field form-control form-text\" type=\"text\" id=\"edit-ville-autocomplete-value-container-label-field\" name=\"ville[autocomplete][value_container][label_field]\" value=\"\" size=\"60\" maxlength=\"128\">\n</div>\n<input class=\"autocomplete-ville-lat\" type=\"hidden\" name=\"ville[autocomplete][value_container][lat_field]\" value=\"\">\n<input class=\"autocomplete-ville-lng\" type=\"hidden\" name=\"ville[autocomplete][value_container][lng_field]\" value=\"\">\n</div>\n</div>\n<div class=\"form-item form-type-slider-custom form-item-ville-distance\">\n  <label for=\"edit-ville-distance\">Rayon (km) </label>\n <div class=\"slider-custom-container\"><div class=\"slider-custom-label\">30 km</div><div id=\"slider-custom-input\" class=\"slider-custom-form jquery-once-4-processed ui-slider ui-slider-horizontal ui-widget ui-widget-content ui-corner-all ui-slider-disabled ui-state-disabled\" aria-disabled=\"true\"><div class=\"ui-slider-range ui-widget-header ui-corner-all ui-slider-range-min\" style=\"width: 9.699%;\"></div><a class=\"ui-slider-handle ui-state-default ui-corner-all\" href=\"#\" style=\"left: 9.699%;\"></a></div></div><div class=\"slider-custom-value-container\" style=\"display: none;\"><input class=\"slider-value-field\" type=\"hidden\" name=\"ville[distance][value_field]\" value=\"30\">\n</div>\n</div>\n</div><div id=\"edit-club\" class=\"form-wrapper form-group\" style=\"display: none;\"><div class=\"form-item form-type-autocomplete-custom form-item-club-autocomplete\">\n  <label class=\"element-invisible\" for=\"edit-club-autocomplete\">Club </label>\n <div class=\"autocomplete-custom-container\">\n<input placeholder=\"Dans quel club voulez-vous jouer ?\" class=\"autocomplete-custom-form form-control form-text init_autocomplete_custom-processed ui-autocomplete-input\" id=\"autocomplete-custom-input--2\" type=\"text\" name=\"club[autocomplete][textfield]\" value=\"\" size=\"\" maxlength=\"128\" autocomplete=\"off\"><span role=\"status\" aria-live=\"polite\" class=\"ui-helper-hidden-accessible\"></span></div><div class=\"autocomple"
+  },
+  "ligue_tests": [],
+  "matched_ligues": [
+    {
+      "target": "AUVERGNE RHONE-ALPES",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "BOURGOGNE FRANCHE COMTE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "BRETAGNE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "CENTRE VAL DE LOIRE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "CORSE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "GRAND EST",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "GUADELOUPE ST MARTIN ST BARTH",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "GUYANE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "HAUTS DE FRANCE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "ILE DE FRANCE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "MARTINIQUE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "NORMANDIE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "NOUVELLE AQUITAINE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "NOUVELLE CALEDONIE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "OCCITANIE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "PAYS DE LA LOIRE",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "PROVENCE ALPES COTE D'AZUR",
+      "code": null,
+      "label": null
+    },
+    {
+      "target": "REUNION - MAYOTTE",
+      "code": null,
+      "label": null
+    }
+  ],
+  "recommendations": {
+    "ligues_with_results": 0,
+    "ligues_pagination_ok": 0,
+    "total_matched": 0,
+    "total_unmatched": 18
+  },
+  "ligue_all_test": {
+    "ligue_name": "ALL_LIGUES",
+    "ligue_code": "ALL",
+    "page_0": {
+      "http_status": 200,
+      "nb_results": 0,
+      "nb_items": 0,
+      "commands": [
+        "settings",
+        "invoke",
+        "insert",
+        "insert"
+      ],
+      "raw_excerpt": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"yy2GEzdpnBWwaTv3bmzPFZs4Xq11eEVgqzkS5K26fcw\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_"
+    },
+    "pagination_ok": null
+  }
+}
