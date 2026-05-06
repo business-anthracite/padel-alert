@@ -1,45 +1,59 @@
 {
-  "run_at": "2026-05-06T16:58:11Z",
+  "run_at": "2026-05-06T17:02:29Z",
+  "tokens_found": {
+    "form_build_id_present": true,
+    "form_token_present": false,
+    "form_id": "recherche_tournois_form",
+    "all_hidden_names": [
+      "ville[autocomplete][value_container][lat_field]",
+      "ville[autocomplete][value_container][lng_field]",
+      "ville[distance][value_field]",
+      "page",
+      "form_build_id",
+      "form_id"
+    ]
+  },
   "tests": [
     {
-      "label": "ville=Paris 50km",
+      "label": "ville Paris 50km",
       "http": 200,
+      "nb_results": 0,
+      "nb_items": 0,
       "commands": [
-        "settings(settings)",
-        "invoke()",
+        "settings",
+        "invoke",
         "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
         "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
       ],
-      "nb_results": 0,
-      "raw_excerpt": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"XBk47e8_P1bD2Kedq-KFcU5VveghMZF1SzCKrOQ6YXI\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_cat1\\u0022:\\u0022competition\\u0022,\\u0022page_name\\u0022:\\u0022resultats\\u0022}\"]},{\"command\":\"insert\",\"method\":\"html\",\"selector\":\"#form-tournois-errors\",\"data\":\"Un choix interdit a \\u00e9t\\u00e9 d\\u00e9tect\\u00e9. Veuillez contacter l\\u0027administrateur du site.\",\"settings\":null},{\"command\":\"inser"
+      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"m98g8bQEHxDxUAgnGOsfj2KyZrpbMONDV7WFR_84u28\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_cat1\\u0022:\\u0022competition\\u0022,\\u0022page_name\\u0022:\\u0022resultats\\u0022}\"]},{\"command\":\"inser"
     },
     {
-      "label": "ligue cbrappel[]=57 fbid_initial",
+      "label": "ligue cbrappel[]=57 IDF",
       "http": 200,
+      "nb_results": 0,
+      "nb_items": 0,
       "commands": [
-        "settings(settings)",
-        "invoke()",
+        "settings",
+        "invoke",
         "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
         "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
       ],
-      "nb_results": 0,
-      "raw_excerpt": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"XBk47e8_P1bD2Kedq-KFcU5VveghMZF1SzCKrOQ6YXI\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_cat1\\u0022:\\u0022competition\\u0022,\\u0022page_name\\u0022:\\u0022resultats\\u0022}\"]},{\"command\":\"insert\",\"method\":\"html\",\"selector\":\"#form-tournois-errors\",\"data\":\"Un choix interdit a \\u00e9t\\u00e9 d\\u00e9tect\\u00e9. Veuillez contacter l\\u0027administrateur du site.\",\"settings\":null},{\"command\":\"inser"
+      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"m98g8bQEHxDxUAgnGOsfj2KyZrpbMONDV7WFR_84u28\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_cat1\\u0022:\\u0022competition\\u0022,\\u0022page_name\\u0022:\\u0022resultats\\u0022}\"]},{\"command\":\"inser"
     },
     {
-      "label": "ligue seul sans params",
+      "label": "ligue cbrappel[]=62 PACA",
       "http": 200,
+      "nb_results": 0,
+      "nb_items": 0,
       "commands": [
-        "settings(settings)",
-        "invoke()",
+        "settings",
+        "invoke",
         "insert(Un choix interdit a été détecté. Veuillez contacter l'administrateur du site.)",
         "insert(<div class=\"recherche-tournois-main-action-secondary\"></div>)"
       ],
-      "nb_results": 0,
-      "raw_excerpt": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"XBk47e8_P1bD2Kedq-KFcU5VveghMZF1SzCKrOQ6YXI\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_cat1\\u0022:\\u0022competition\\u0022,\\u0022page_name\\u0022:\\u0022resultats\\u0022}\"]},{\"command\":\"insert\",\"method\":\"html\",\"selector\":\"#form-tournois-errors\",\"data\":\"Un choix interdit a \\u00e9t\\u00e9 d\\u00e9tect\\u00e9. Veuillez contacter l\\u0027administrateur du site.\",\"settings\":null},{\"command\":\"inser"
+      "raw": "[{\"command\":\"settings\",\"settings\":{\"basePath\":\"\\/\",\"pathPrefix\":\"\",\"setHasJsCookie\":0,\"ajaxPageState\":{\"theme\":\"met\",\"theme_token\":\"m98g8bQEHxDxUAgnGOsfj2KyZrpbMONDV7WFR_84u28\"}},\"merge\":true},{\"command\":\"invoke\",\"selector\":null,\"method\":\"met_tagcommander_reload\",\"arguments\":[\"{\\u0022env_template\\u0022:\\u0022competition\\u0022,\\u0022env_work\\u0022:\\u0022prod\\u0022,\\u0022env_secure\\u0022:\\u0022https\\u0022,\\u0022user_login\\u0022:\\u0022unlogged\\u0022,\\u0022user_gender\\u0022:\\u0022U\\u0022,\\u0022page_cat1\\u0022:\\u0022competition\\u0022,\\u0022page_name\\u0022:\\u0022resultats\\u0022}\"]},{\"command\":\"inser"
     }
   ],
-  "conclusion": "ville_controle=0, ligue_tests_working=0",
-  "playwright_submit": {
-    "error": "Page.evaluate: SyntaxError: Failed to execute 'querySelector' on 'Document': '#57_cbrappel' is not a valid selector.\n    at eval (eval at evaluate (:234:30), <anonymous>:17:45)\n    at NodeList.forEach (<anonymous>)\n    at eval (eval at evaluate (:234:30), <anonymous>:15:52)\n    at UtilityScript.evaluate (<anonymous>:241:19)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)"
-  }
+  "working": [],
+  "conclusion": "form_token=NON, ville=KO, ligue_IDF=KO, working=0/18"
 }
