@@ -1,15 +1,15 @@
 """
-Padel Alert — Scraper France v6 — mode global (single_global)
+Padel Alert — Scraper France v6 — fenêtres 1-jour
 
-Découverte diagnostics 06/05/2026 :
-- Ten'Up a redesigné son formulaire (anciens codes ALL_CRITERIA invalides)
-- sort="_DATE_" invalide → sort="dateDebut asc" requis
-- Le filtre cbrappel[]=ID (ligue) n'est PAS appliqué côté serveur :
-  IDF (57) et CORSE (54) retournent les mêmes 10 000 tournois (100% overlap)
-- Approche optimale : UNE SEULE série de pages, pratique=PADEL, sans filtre ligue
-- 10 000 / 30 = 333 pages × ~0.25s = ~5 minutes (vs 90 min avec 18 ligues)
+Découvertes diagnostics 06-07/05/2026 :
+- Ten'Up a redesigné son formulaire : nouveaux critères famille_tournois[], categorie_age[], etc.
+- Anciens critères (P25/P50, type[P], categorie_age[910]) → "Un choix interdit"
+- sort="dateDebut asc" valide (vs "_DATE_" invalide)
+- La pagination est cassée avec les nouveaux critères (pages 1,2,3... = même 30 items)
+- Solution : fenêtres de 1 jour → ~12 tournois/jour, pas besoin de pagination
+- 90 jours × 0.15s = ~15 secondes de scraping
 """
-import os, json, math, subprocess, time
+import os, json, subprocess, time
 from datetime import datetime, timedelta
 import requests
 from playwright.sync_api import sync_playwright
@@ -22,6 +22,29 @@ HORIZON_DAYS = 90
 RETRY_MAX    = 3
 
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+
+# Nouveaux critères Ten'Up (redesign entre avril et mai 2026)
+# Remplacent les anciens P25/P50/type[P]/categorie_age[910] qui causaient "Un choix interdit"
+NEW_CRITERIA = {
+    "epreuve[DX]": "DX", "epreuve[DM]": "DM", "epreuve[DD]": "DD",
+    "categorie_age[70|80|96|97|98|90|95|65|99|100]": "70|80|96|97|98|90|95|65|99|100",
+    "categorie_age[110]": "110", "categorie_age[120]": "120", "categorie_age[125]": "125",
+    "categorie_age[130]": "130", "categorie_age[140]": "140", "categorie_age[145]": "145",
+    "categorie_age[160]": "160", "categorie_age[180]": "180", "categorie_age[200]": "200",
+    "categorie_age[350]": "350", "categorie_age[400]": "400", "categorie_age[450]": "450",
+    "categorie_age[500]": "500", "categorie_age[550]": "550", "categorie_age[600]": "600",
+    "categorie_age[650]": "650", "categorie_age[700]": "700", "categorie_age[750]": "750",
+    "categorie_age[800]": "800",
+    "type[T]": "T", "type[C]": "C",
+    "famille_tournois[TRADI]": "TRADI", "famille_tournois[MULTI]": "MULTI",
+    "famille_tournois[TMC_D]": "TMC_D", "famille_tournois[TMC_M]": "TMC_M",
+    "famille_tournois[COURT_ADUL]": "COURT_ADUL",
+    "famille_tournois[TRADI_V]": "TRADI_V", "famille_tournois[MULTI_V]": "MULTI_V",
+    "famille_tournois[GALAXIE_O]": "GALAXIE_O", "famille_tournois[GALAXIE_V]": "GALAXIE_V",
+    "famille_tournois[CNGT]": "CNGT", "famille_tournois[NTC]": "NTC",
+    "surface[B_PIL]": "B_PIL", "surface[DUR  ]": "DUR  ",
+    "surface[GAZON]": "GAZON", "surface[AUTRE]": "AUTRE",
+}
 
 
 # ── Session ────────────────────────────────────────────────────────────────────
@@ -62,24 +85,24 @@ def make_session(cookies):
 
 # ── AJAX ───────────────────────────────────────────────────────────────────────
 
-def ajax_page(session, fbid, date_start, date_end, page_num):
-    """Appel AJAX global. Retourne (items, nb_total).
-    Note : cbrappel[]=57 est requis pour la pagination côté serveur
-    (sans lui le serveur renvoie toujours la même page 0, même si le
-    filtre ligue ne filtre pas réellement les résultats).
+def ajax_day(session, fbid, date_day):
+    """AJAX pour un jour précis. Retourne (items, nb_total).
+    Stratégie fenêtre 1-jour : contourne la pagination cassée avec les nouveaux critères.
+    Avec ~12 tournois/jour en moyenne, on reste sous le seuil de 30/page.
     """
     data = {
         "recherche_type": "ligue",
-        "cbrappel[]": "57",          # requis pour pagination (IDF=57, filtre ignoré côté serveur)
+        "cbrappel[]": "57",          # requis pour la session (filtre non appliqué côté serveur)
         "pratique": "PADEL",
-        "date[start]": date_start,
-        "date[end]":   date_end,
-        "sort": "dateDebut asc",     # valeur valide confirmée le 06/05/2026
+        "date[start]": date_day,
+        "date[end]":   date_day,
+        "sort": "dateDebut asc",
+        **NEW_CRITERIA,
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  "submit_main",
         "_triggering_element_value": "Rechercher",
         "form_build_id": fbid,
-        "page": str(page_num),
+        "page": "0",
     }
     for attempt in range(1, RETRY_MAX + 1):
         try:
@@ -89,11 +112,9 @@ def ajax_page(session, fbid, date_start, date_end, page_num):
                 if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
                     res = cmd.get("results", {})
                     return res.get("items", []), res.get("nb_results", 0)
-            cmds = [c.get("command") for c in resp.json() if isinstance(c, dict)]
-            print(f"  WARN page {page_num} attempt {attempt}: commandes={cmds} raw={resp.text[:200]}")
             return [], 0
         except Exception as e:
-            print(f"  Erreur page {page_num} attempt {attempt}: {e}")
+            print(f"  Erreur jour {date_day} attempt {attempt}: {e}")
             if attempt < RETRY_MAX:
                 time.sleep(2 * attempt)
     return [], 0
@@ -172,51 +193,38 @@ def parse_item(item):
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    now        = datetime.now()
-    date_start = now.strftime("%d/%m/%y")
-    date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v6 global ({date_start}→{date_end})")
+    now = datetime.now()
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v6 fenêtres 1-jour ({HORIZON_DAYS} jours)")
 
     fbid, cookies = get_session()
     session = make_session(cookies)
 
     all_items = {}
+    overflow_days = []  # jours avec 30 items (possiblement tronqués)
 
-    # Page 0 : découvrir nb_total
-    items0, nb_total = ajax_page(session, fbid, date_start, date_end, 0)
-    for it in items0:
-        all_items[str(it.get("id", ""))] = it
-
-    if nb_total == 0:
-        print("ERREUR : 0 résultats page 0 — vérifier les paramètres AJAX")
-        raise SystemExit(1)
-
-    nb_pages = math.ceil(nb_total / 30)
-    print(f"{nb_total} tournois annoncés → {nb_pages} pages à scraper")
-
-    empty_streak = 0
-    for page_num in range(1, nb_pages):
-        items, _ = ajax_page(session, fbid, date_start, date_end, page_num)
-        if not items:
-            empty_streak += 1
-            if empty_streak >= 3:
-                print(f"  3 pages vides consécutives à la page {page_num} — arrêt")
-                break
-            continue
-        empty_streak = 0
+    for day_offset in range(HORIZON_DAYS):
+        date_day = (now + timedelta(days=day_offset)).strftime("%d/%m/%y")
+        items, nb = ajax_day(session, fbid, date_day)
         for it in items:
             all_items[str(it.get("id", ""))] = it
-        if page_num % 50 == 0:
+        if nb >= 30:
+            overflow_days.append({"date": date_day, "nb": nb})
+        if day_offset % 15 == 0 and day_offset > 0:
             elapsed = (datetime.now() - now).total_seconds()
-            print(f"  Page {page_num}/{nb_pages - 1} — {len(all_items)} collectés ({elapsed:.0f}s)")
-        time.sleep(0.2)
+            print(f"  Jour {day_offset}/{HORIZON_DAYS} — {len(all_items)} collectés ({elapsed:.0f}s)")
+        time.sleep(0.15)
+
+    if overflow_days:
+        print(f"\nATTENTION : {len(overflow_days)} jours avec 30+ résultats (pagination non tentée) :")
+        for d in overflow_days:
+            print(f"  {d['date']} : nb={d['nb']}")
 
     tournaments = [t for item in all_items.values() if (t := parse_item(item))]
     elapsed_total = (datetime.now() - now).total_seconds()
 
     print(f"\n{'='*60}")
     print(f"Total : {len(tournaments)} tournois uniques en {elapsed_total:.0f}s")
-    print(f"(nb_total annoncé Ten'Up : {nb_total})")
+    print(f"({HORIZON_DAYS} fenêtres 1-jour, {len(overflow_days)} jours avec overflow potentiel)")
 
     # Écrire JSON
     os.makedirs("data", exist_ok=True)
