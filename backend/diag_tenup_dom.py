@@ -100,47 +100,114 @@ def main():
             for inp in form_info["inputs"][:15]:
                 print(f"  [{inp['type']}] {inp['name']} = {inp['value']!r}")
 
-        # ── 3. Remplir le formulaire via JS ────────────────────────────────────
-        print("\n3. Remplissage formulaire (JS direct)...")
+        # ── 3. Remplir le formulaire via interactions réelles ─────────────────
+        # Le bouton submit est disabled tant que l'autocomplete ville n'a pas été
+        # sélectionné — on ne peut pas juste injecter les hidden fields en JS.
+        print("\n3. Remplissage formulaire (interactions Playwright réelles)...")
         date_start = datetime.now().strftime("%d/%m/%y")
         date_end   = (datetime.now() + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
 
-        fill_values = {
-            "recherche_type":                                          "ville",
-            "ville[autocomplete][country]":                           "fr",
-            "ville[autocomplete][textfield]":                         VILLE_TEST["value"],
-            "ville[autocomplete][value_container][value_field]":      VILLE_TEST["value"],
-            "ville[autocomplete][value_container][label_field]":      VILLE_TEST["label"],
-            "ville[autocomplete][value_container][lat_field]":        VILLE_TEST["lat"],
-            "ville[autocomplete][value_container][lng_field]":        VILLE_TEST["lng"],
-            "ville[distance][value_field]":                           "100",
-            "pratique":                                               "PADEL",
-            "date[start]":                                            date_start,
-            "date[end]":                                              date_end,
-            "sort":                                                   "_DIST_",
-        }
-        fill_result = page.evaluate("(vals) => { let ok=0, nf=[]; for (const [n,v] of Object.entries(vals)) { const el=document.querySelector(`[name='${n}']`); if(el){el.value=v;ok++;}else{nf.push(n);} } return {ok, notFound: nf}; }", fill_values)
-        print(f"  Champs remplis: {fill_result['ok']}, non trouvés: {fill_result['notFound']}")
+        # 3a. Sélectionner PADEL
+        page.click('input[name="pratique"][value="PADEL"]', timeout=5000)
+        print("  PADEL coché")
+        page.wait_for_timeout(500)
 
-        # Cocher les checkboxes critères
-        checked_result = page.evaluate("(keys) => { let ok=0, nf=[]; for (const k of keys) { const el=document.querySelector(`input[name='${k}']`); if(el){el.checked=true;ok++;}else{nf.push(k);} } return {ok, notFound: nf}; }", NEW_CRITERIA_KEYS)
+        # 3b. Remplir la distance via hidden field (injecté JS — pas de UI)
+        page.evaluate("""(val) => {
+            const el = document.querySelector('[name="ville[distance][value_field]"]');
+            if (el) { el.value = val; el.dispatchEvent(new Event('change', {bubbles:true})); }
+        }""", "100")
+
+        # 3c. Remplir les dates
+        for field, val in [("date[start]", date_start), ("date[end]", date_end)]:
+            page.evaluate(f"""() => {{
+                const el = document.querySelector('[name="{field}"]');
+                if (el) {{ el.value = "{val}"; el.dispatchEvent(new Event('change', {{bubbles:true}})); }}
+            }}""")
+
+        # 3d. Cocher les critères via JS (dispatch change pour chaque)
+        checked_result = page.evaluate("""(keys) => {
+            let ok=0, nf=[];
+            for (const k of keys) {
+                const el = document.querySelector(`input[name='${k}']`);
+                if (el) {
+                    el.checked = true;
+                    el.dispatchEvent(new Event('change', {bubbles: true}));
+                    ok++;
+                } else { nf.push(k); }
+            }
+            return {ok, notFound: nf};
+        }""", NEW_CRITERIA_KEYS)
         print(f"  Critères cochés: {checked_result['ok']}, non trouvés: {checked_result['notFound'][:5]}")
 
+        # 3e. Autocomplete ville : taper la ville et sélectionner la suggestion
+        city_short = VILLE_TEST["value"].split(",")[0]
+        ville_input = page.locator('input[name="ville[autocomplete][textfield]"]')
+        ville_input.fill(city_short[:8])  # Premiers caractères pour déclencher l'autocomplete
+        print(f"  Ville tapée: '{city_short[:8]}', attente autocomplete...")
+        page.wait_for_timeout(3000)
+
+        # Chercher les suggestions autocomplete
+        suggestion_selectors = [
+            '.ui-autocomplete .ui-menu-item',
+            '.ui-menu .ui-menu-item',
+            '[role="listbox"] [role="option"]',
+            '.autocomplete li',
+            'ul.ui-autocomplete li',
+        ]
+        suggestion_found = False
+        for sel in suggestion_selectors:
+            try:
+                suggestions = page.locator(sel)
+                count = suggestions.count()
+                print(f"  Suggestions ({sel}): {count}")
+                if count > 0:
+                    # Afficher le texte des suggestions
+                    for i in range(min(3, count)):
+                        txt = suggestions.nth(i).text_content()
+                        print(f"    [{i}] {txt!r}")
+                    suggestions.first.click(timeout=3000)
+                    suggestion_found = True
+                    print(f"  Suggestion cliquée (sélecteur: {sel})")
+                    page.wait_for_timeout(1000)
+                    break
+            except Exception as e:
+                print(f"  Sélecteur {sel} : {e}")
+
+        if not suggestion_found:
+            print("  Aucune suggestion trouvée — injection JS forcée + removeDisabled")
+            # Fallback : injecter les valeurs et forcer l'activation du bouton
+            page.evaluate("""(v) => {
+                const fields = {
+                    "ville[autocomplete][value_container][value_field]": v.value,
+                    "ville[autocomplete][value_container][label_field]": v.label,
+                    "ville[autocomplete][value_container][lat_field]":   v.lat,
+                    "ville[autocomplete][value_container][lng_field]":   v.lng,
+                };
+                for (const [n, val] of Object.entries(fields)) {
+                    const el = document.querySelector(`[name='${n}']`);
+                    if (el) { el.value = val; el.dispatchEvent(new Event('change', {bubbles:true})); }
+                }
+                const btn = document.querySelector('[name="submit_main"]');
+                if (btn) { btn.removeAttribute('disabled'); btn.disabled = false; }
+            }""", VILLE_TEST)
+
+        # Vérifier si le bouton est maintenant activé
+        btn_state = page.evaluate("""() => {
+            const btn = document.querySelector('[name="submit_main"]');
+            return {found: !!btn, disabled: btn?.disabled, disabledAttr: btn?.getAttribute('disabled')};
+        }""")
+        print(f"  Bouton submit: {btn_state}")
+
         # ── 4. Soumettre ───────────────────────────────────────────────────────
-        # IMPORTANT : utiliser page.locator().click() (pas evaluate) pour déclencher
-        # les event listeners jQuery Drupal (mousedown/mouseup/click)
-        print("\n4. Clic Rechercher (Playwright natif)...")
-        btn_locator = page.locator('[name="submit_main"]').first
-        btn_found = btn_locator.count() > 0
-        submit_result = {"found": btn_found}
-        if btn_found:
-            btn_locator.click()
-            submit_result["clicked"] = True
+        print("\n4. Clic Rechercher...")
+        if not btn_state.get("disabled", True):
+            page.locator('[name="submit_main"]').first.click(timeout=5000)
+            print("  Click via locator")
         else:
-            # Fallback : submit le formulaire entier
-            page.locator("form#recherche-tournois-form").evaluate("f => f.submit()")
-            submit_result["fallback"] = "form.submit()"
-        print(f"  Submit: {submit_result}")
+            # Forcer le click même si disabled
+            page.locator('[name="submit_main"]').first.click(force=True, timeout=5000)
+            print("  Click forcé (force=True)")
         page.wait_for_timeout(15000)
 
         # ── 5. Screenshot post-submit ──────────────────────────────────────────
