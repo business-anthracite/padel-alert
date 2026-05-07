@@ -11,6 +11,7 @@ Ten'Up post-redesign (mai 2026) :
 43 communes = couverture optimale métropole + Corse, rayon 100km
 """
 import os, json, math, subprocess, time
+from math import radians, cos
 from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
@@ -185,69 +186,107 @@ def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
     return [], 0
 
 
+def coord_offsets(base_lat, base_lng, nb_total):
+    """
+    Génère des centres décalés pour contourner la limite de 30 résultats/requête.
+    Avec sort=_DIST_, chaque centre donne un classement différent → 30 autres tournois.
+    """
+    if nb_total <= 30:
+        return []
+    extra = min(math.ceil(nb_total / 30) - 1, 10)  # max 10 offsets par ville
+    # 8 directions × 3 distances = 24 offsets possibles
+    dirs = [(1,0),(-1,0),(0,1),(0,-1),(0.7,0.7),(-0.7,0.7),(0.7,-0.7),(-0.7,-0.7)]
+    result = []
+    for km in [20, 40, 60]:
+        for dlat, dlng in dirs:
+            dlat_deg = dlat * km / 111.0
+            dlng_deg = dlng * km / (111.0 * cos(radians(base_lat)))
+            result.append((base_lat + dlat_deg, base_lng + dlng_deg))
+            if len(result) >= extra:
+                return result
+    return result[:extra]
+
+
+def ajax_ville_offset(session, fbid, ville, olat, olng, date_start, date_end):
+    """Appel AJAX avec des coordonnées décalées (même ville, centre différent)."""
+    data = {
+        "recherche_type": "ville",
+        "ville[autocomplete][country]": "fr",
+        "ville[autocomplete][textfield]": "",
+        "ville[autocomplete][value_container][value_field]": ville["ville_value"],
+        "ville[autocomplete][value_container][label_field]": ville["ville_label"],
+        "ville[autocomplete][value_container][lat_field]":   f"{olat:.6f}",
+        "ville[autocomplete][value_container][lng_field]":   f"{olng:.6f}",
+        "ville[distance][value_field]": RAYON,
+        "pratique": "PADEL",
+        "date[start]": date_start,
+        "date[end]":   date_end,
+        **NEW_CRITERIA,
+        "sort": "_DIST_",
+        "form_id": "recherche_tournois_form",
+        "_triggering_element_name":  "submit_main",
+        "_triggering_element_value": "Rechercher",
+        "form_build_id": fbid,
+        "page": "0",
+    }
+    for attempt in range(1, RETRY_MAX + 1):
+        try:
+            resp = session.post(TENUP_AJAX, data=data, timeout=45)
+            resp.raise_for_status()
+            for cmd in resp.json():
+                if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
+                    res = cmd.get("results", {})
+                    return res.get("items", []), res.get("nb_results", 0)
+            return [], 0
+        except Exception as e:
+            if attempt < RETRY_MAX:
+                time.sleep(2 * attempt)
+    return [], 0
+
+
 def scrape_ville(session, fbid, ville, date_start, date_end):
     """
-    Scrape tous les tournois d'une ville avec pagination robuste.
-    Gestion des cas :
-    - page 0 vide (fallback page 1)
-    - pagination cyclique (détection par first_id et new_count)
-    - pages incomplètes (< 30 items = dernière page)
+    Scrape tous les tournois d'une ville.
+    Stratégie : si nb_total > 30, décaler le centre de recherche (sort=_DIST_
+    donne un classement différent → 30 autres tournois par offset).
+    La pagination classique est cassée côté Ten'Up pour les nouvelles requêtes,
+    mais les offsets de coordonnées contournent cette limitation.
     """
     name = ville["ville_value"].split(",")[0]
     all_items = {}
-    page_first_ids = []  # premier ID de chaque page, pour détecter les cycles
 
-    # Page 0
+    # Page initiale (coordonnées originales)
     items0, nb_total = ajax_ville_page(session, fbid, ville, date_start, date_end, 0)
 
-    # Fallback : si page 0 vide mais nb_total > 0, essayer page 1
+    # Fallback page 1 si page 0 vide
     if not items0 and nb_total == 0:
-        items1, nb_total1 = ajax_ville_page(session, fbid, ville, date_start, date_end, 1)
-        if items1:
-            print(f"  {name} : page 0 vide, démarrage page 1 (nb={nb_total1})")
-            items0, nb_total = items1, nb_total1
+        items0, nb_total = ajax_ville_page(session, fbid, ville, date_start, date_end, 1)
 
     for it in items0:
         all_items[str(it.get("id", ""))] = it
-    if items0:
-        page_first_ids.append(str(items0[0].get("id", "")))
 
     if nb_total == 0:
         return list(all_items.values()), 0
 
-    nb_pages = math.ceil(nb_total / 30)
-    # Toujours tenter la pagination à partir de page 1
-    # Cap à 200 pages max par ville (~6000 résultats max)
-    for page_num in range(1, min(nb_pages + 1, 201)):
-        items, _ = ajax_ville_page(session, fbid, ville, date_start, date_end, page_num)
-        if not items:
-            break
+    # Offsets de coordonnées pour couvrir les résultats au-delà de 30
+    if nb_total > 30:
+        base_lat = float(ville["lat"])
+        base_lng = float(ville["lng"])
+        offsets = coord_offsets(base_lat, base_lng, nb_total)
+        for olat, olng in offsets:
+            items_off, _ = ajax_ville_offset(session, fbid, ville, olat, olng, date_start, date_end)
+            if not items_off:
+                break
+            new_count = sum(
+                1 for it in items_off
+                if str(it.get("id","")) and str(it.get("id","")) not in all_items
+                and not all_items.update({str(it.get("id","")): it})
+            )
+            if new_count == 0:
+                break  # plus rien de nouveau, inutile de continuer
+            time.sleep(0.25)
 
-        first_id = str(items[0].get("id", ""))
-
-        # Détecter pagination cyclique : le premier item de cette page est déjà apparu
-        if first_id in page_first_ids:
-            break
-        page_first_ids.append(first_id)
-
-        new_count = 0
-        for it in items:
-            tid = str(it.get("id", ""))
-            if tid and tid not in all_items:
-                all_items[tid] = it
-                new_count += 1
-
-        if new_count == 0:
-            break  # tous les items déjà vus (cycle sans new first_id)
-
-        # Si page incomplète (<30) : probablement la dernière
-        if len(items) < 30:
-            break
-
-        time.sleep(0.25)
-
-    if nb_total > 0:
-        print(f"  {name} ({RAYON}km) : {nb_total} résultats → {len(all_items)} uniques ({len(page_first_ids)} pages)")
+    print(f"  {name} ({RAYON}km) : {nb_total} résultats → {len(all_items)} uniques")
     return list(all_items.values()), nb_total
 
 
