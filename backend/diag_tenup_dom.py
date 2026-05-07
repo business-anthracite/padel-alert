@@ -1,11 +1,14 @@
 """
-Diagnostic Piste 4 — Test pagination DOM Ten'Up via Playwright
+Diagnostic Piste 4 — Test pagination via fetch() dans le contexte browser Playwright
 
-Question centrale : quand Playwright clique réellement "page suivante",
-l'AJAX retourne-t-il des items différents de la page 0 ?
-(notre approche AJAX synthétique avec page=1,2... retourne toujours les mêmes 30 items)
+Question centrale : quand on envoie page=0 puis page=1 depuis le VRAI navigateur
+(avec ses vrais cookies, headers, contexte JS), les items sont-ils différents ?
+Notre requests.Session retourne les mêmes 30 items sur page=1 — est-ce un problème
+de cookies manquants, ou la pagination est vraiment cassée côté serveur ?
 
-Résultats dans les logs GitHub Actions + screenshot en artifact.
+Méthode : page.evaluate(async ...) = fetch() depuis le browser Playwright,
+pas via requests.Session externe. Si les résultats diffèrent → réécrire v7 avec
+cette approche. Si identiques → pagination vraiment cassée, même niveau serveur.
 """
 import json
 import time
@@ -16,7 +19,7 @@ TENUP_SEARCH = "https://tenup.fft.fr/recherche/tournois"
 TENUP_AJAX   = "https://tenup.fft.fr/system/ajax"
 HORIZON_DAYS = 90
 
-# Ville test : Montereau (nb_total ~111, v6 n'en scrape que ~91)
+# Ville test : Montereau (~111 résultats, idéale pour tester la pagination)
 VILLE_TEST = {
     "value":  "Montereau-Fault-Yonne, 77130",
     "label":  "Montereau-Fault-Yonne, 77, Seine-et-Marne, Île-de-France",
@@ -24,28 +27,101 @@ VILLE_TEST = {
     "lng":    "2.9500",
 }
 
-NEW_CRITERIA_KEYS = [
-    "epreuve[DX]", "epreuve[DM]", "epreuve[DD]",
-    "categorie_age[70|80|96|97|98|90|95|65|99|100]",
-    "categorie_age[110]", "categorie_age[120]", "categorie_age[125]",
-    "categorie_age[130]", "categorie_age[140]", "categorie_age[145]",
-    "categorie_age[160]", "categorie_age[180]", "categorie_age[200]",
-    "categorie_age[350]", "categorie_age[400]", "categorie_age[450]",
-    "categorie_age[500]", "categorie_age[550]", "categorie_age[600]",
-    "categorie_age[650]", "categorie_age[700]", "categorie_age[750]",
-    "categorie_age[800]",
-    "type[T]", "type[C]",
-    "famille_tournois[TRADI]", "famille_tournois[MULTI]",
-    "famille_tournois[TMC_D]", "famille_tournois[TMC_M]",
-    "famille_tournois[COURT_ADUL]", "famille_tournois[TRADI_V]",
-    "famille_tournois[MULTI_V]", "famille_tournois[GALAXIE_O]",
-    "famille_tournois[GALAXIE_V]", "famille_tournois[CNGT]", "famille_tournois[NTC]",
-    "surface[B_PIL]", "surface[DUR  ]", "surface[GAZON]", "surface[AUTRE]",
-]
+NEW_CRITERIA = {
+    "epreuve[DX]": "DX", "epreuve[DM]": "DM", "epreuve[DD]": "DD",
+    "categorie_age[70|80|96|97|98|90|95|65|99|100]": "70|80|96|97|98|90|95|65|99|100",
+    "categorie_age[110]": "110", "categorie_age[120]": "120", "categorie_age[125]": "125",
+    "categorie_age[130]": "130", "categorie_age[140]": "140", "categorie_age[145]": "145",
+    "categorie_age[160]": "160", "categorie_age[180]": "180", "categorie_age[200]": "200",
+    "categorie_age[350]": "350", "categorie_age[400]": "400", "categorie_age[450]": "450",
+    "categorie_age[500]": "500", "categorie_age[550]": "550", "categorie_age[600]": "600",
+    "categorie_age[650]": "650", "categorie_age[700]": "700", "categorie_age[750]": "750",
+    "categorie_age[800]": "800",
+    "type[T]": "T", "type[C]": "C",
+    "famille_tournois[TRADI]": "TRADI", "famille_tournois[MULTI]": "MULTI",
+    "famille_tournois[TMC_D]": "TMC_D", "famille_tournois[TMC_M]": "TMC_M",
+    "famille_tournois[COURT_ADUL]": "COURT_ADUL", "famille_tournois[TRADI_V]": "TRADI_V",
+    "famille_tournois[MULTI_V]": "MULTI_V", "famille_tournois[GALAXIE_O]": "GALAXIE_O",
+    "famille_tournois[GALAXIE_V]": "GALAXIE_V", "famille_tournois[CNGT]": "CNGT",
+    "famille_tournois[NTC]": "NTC",
+    "surface[B_PIL]": "B_PIL", "surface[DUR  ]": "DUR  ",
+    "surface[GAZON]": "GAZON", "surface[AUTRE]": "AUTRE",
+}
+
+
+def ajax_via_browser(page, fbid, page_num, date_start, date_end):
+    """
+    Envoie une requête AJAX Ten'Up depuis le contexte browser Playwright (fetch interne).
+    Utilise les vrais cookies/headers du browser, pas requests.Session externe.
+    Retourne (items, nb_total) ou ([], 0) en cas d'erreur.
+    """
+    post_data = {
+        "recherche_type": "ville",
+        "ville[autocomplete][country]": "fr",
+        "ville[autocomplete][textfield]": "",
+        "ville[autocomplete][value_container][value_field]":  VILLE_TEST["value"],
+        "ville[autocomplete][value_container][label_field]":  VILLE_TEST["label"],
+        "ville[autocomplete][value_container][lat_field]":    VILLE_TEST["lat"],
+        "ville[autocomplete][value_container][lng_field]":    VILLE_TEST["lng"],
+        "ville[distance][value_field]": "100",
+        "pratique": "PADEL",
+        "date[start]": date_start,
+        "date[end]":   date_end,
+        **NEW_CRITERIA,
+        "sort": "_DIST_",
+        "form_id": "recherche_tournois_form",
+        "_triggering_element_name":  "submit_main",
+        "_triggering_element_value": "Rechercher",
+        "form_build_id": fbid,
+        "page": str(page_num),
+    }
+
+    # Utiliser fetch() depuis le browser Playwright (vrais cookies, same-origin)
+    result = page.evaluate("""async (params) => {
+        try {
+            const body = new URLSearchParams(params).toString();
+            const response = await fetch('/system/ajax', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'Accept-Language': 'fr-FR,fr;q=0.9',
+                },
+                body: body,
+            });
+            const data = await response.json();
+            for (const cmd of data) {
+                if (cmd && cmd.command === 'recherche_tournois_update') {
+                    const items = cmd.results?.items || [];
+                    return {
+                        ok: true,
+                        status: response.status,
+                        nb_total: cmd.results?.nb_results || 0,
+                        count: items.length,
+                        ids: items.map(it => String(it.id || '')),
+                        first_item: items[0] ? {id: items[0].id, libelle: items[0].libelle} : null,
+                    };
+                }
+            }
+            return {ok: false, status: response.status, commands: data.map(c => c?.command)};
+        } catch (e) {
+            return {ok: false, error: String(e)};
+        }
+    }""", post_data)
+
+    return result
 
 
 def main():
-    intercepted = []  # liste de {page_num, nb_total, count, ids}
+    print("=" * 60)
+    print("Diagnostic Piste 4 — fetch() browser Playwright")
+    print("=" * 60)
+
+    date_start = datetime.now().strftime("%d/%m/%y")
+    date_end   = (datetime.now() + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
+    print(f"Ville: {VILLE_TEST['value']}, période: {date_start} → {date_end}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -55,263 +131,69 @@ def main():
         )
         page = ctx.new_page()
 
-        # ── Intercepter les réponses AJAX ──────────────────────────────────────
-        def on_response(response):
-            if TENUP_AJAX in response.url:
-                try:
-                    data = response.json()
-                    for cmd in data:
-                        if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
-                            items    = cmd["results"].get("items", [])
-                            nb_total = cmd["results"].get("nb_results", 0)
-                            ids      = [str(it.get("id", "")) for it in items]
-                            entry = {
-                                "page_num": len(intercepted),
-                                "nb_total": nb_total,
-                                "count":    len(ids),
-                                "ids":      ids,
-                            }
-                            intercepted.append(entry)
-                            print(f"[AJAX p{entry['page_num']}] {len(ids)} items, nb_total={nb_total}, "
-                                  f"first_ids={ids[:3]}")
-                except Exception as e:
-                    pass
-
-        page.on("response", on_response)
-
-        # ── 1. Charger la page ─────────────────────────────────────────────────
-        print("=" * 60)
-        print("1. Chargement Ten'Up...")
+        # ── 1. Charger Ten'Up ──────────────────────────────────────────────────
+        print("\n1. Chargement Ten'Up...")
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(8000)
 
-        # ── 2. Inspecter le formulaire ─────────────────────────────────────────
-        print("\n2. Inspection formulaire...")
-        form_info = page.evaluate("""() => {
-            const form = document.querySelector('form');
-            if (!form) return {found: false, html: document.body.innerHTML.substring(0, 500)};
-            const inputs = [...form.querySelectorAll('input,select')].map(el => ({
-                name: el.name, type: el.type, value: (el.value || '').substring(0, 50)
-            })).filter(el => el.name);
-            return {found: true, id: form.id, action: form.action, inputCount: inputs.length, inputs: inputs.slice(0, 40)};
-        }""")
-        print(f"Formulaire trouvé: {form_info.get('found')}, id={form_info.get('id')}, inputs={form_info.get('inputCount')}")
-        if form_info.get("inputs"):
-            for inp in form_info["inputs"][:15]:
-                print(f"  [{inp['type']}] {inp['name']} = {inp['value']!r}")
+        fbid = page.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value || ''")
+        print(f"   form_build_id: {fbid[:40]}..." if fbid else "   ERREUR: form_build_id introuvable")
 
-        # ── 3. Remplir le formulaire via interactions réelles ─────────────────
-        # Le bouton submit est disabled tant que l'autocomplete ville n'a pas été
-        # sélectionné — on ne peut pas juste injecter les hidden fields en JS.
-        print("\n3. Remplissage formulaire (interactions Playwright réelles)...")
-        date_start = datetime.now().strftime("%d/%m/%y")
-        date_end   = (datetime.now() + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
+        if not fbid:
+            print("Abandon — pas de form_build_id")
+            browser.close()
+            return
 
-        # 3a. Sélectionner PADEL
-        page.click('input[name="pratique"][value="PADEL"]', timeout=5000)
-        print("  PADEL coché")
-        page.wait_for_timeout(500)
+        # ── 2. Page 0 via fetch() browser ──────────────────────────────────────
+        print("\n2. Requête AJAX page 0 (via fetch browser)...")
+        r0 = ajax_via_browser(page, fbid, 0, date_start, date_end)
+        print(f"   Résultat: {r0}")
+        page.wait_for_timeout(2000)
 
-        # 3b. Remplir la distance via hidden field (injecté JS — pas de UI)
-        page.evaluate("""(val) => {
-            const el = document.querySelector('[name="ville[distance][value_field]"]');
-            if (el) { el.value = val; el.dispatchEvent(new Event('change', {bubbles:true})); }
-        }""", "100")
+        if not r0.get("ok"):
+            print(f"\nErreur page 0 — arrêt. Détails: {r0}")
+            page.screenshot(path="diag_error.png")
+            browser.close()
+            return
 
-        # 3c. Remplir les dates
-        for field, val in [("date[start]", date_start), ("date[end]", date_end)]:
-            page.evaluate(f"""() => {{
-                const el = document.querySelector('[name="{field}"]');
-                if (el) {{ el.value = "{val}"; el.dispatchEvent(new Event('change', {{bubbles:true}})); }}
-            }}""")
+        ids_p0    = set(r0["ids"])
+        nb_total  = r0["nb_total"]
+        print(f"   Page 0 : {r0['count']} items, nb_total={nb_total}")
+        print(f"   Premiers IDs: {r0['ids'][:5]}")
+        print(f"   Premier item: {r0.get('first_item')}")
 
-        # 3d. Cocher les critères via JS (dispatch change pour chaque)
-        checked_result = page.evaluate("""(keys) => {
-            let ok=0, nf=[];
-            for (const k of keys) {
-                const el = document.querySelector(`input[name='${k}']`);
-                if (el) {
-                    el.checked = true;
-                    el.dispatchEvent(new Event('change', {bubbles: true}));
-                    ok++;
-                } else { nf.push(k); }
-            }
-            return {ok, notFound: nf};
-        }""", NEW_CRITERIA_KEYS)
-        print(f"  Critères cochés: {checked_result['ok']}, non trouvés: {checked_result['notFound'][:5]}")
+        # ── 3. Page 1 via fetch() browser ──────────────────────────────────────
+        print("\n3. Requête AJAX page 1 (même fbid, page=1)...")
+        r1 = ajax_via_browser(page, fbid, 1, date_start, date_end)
+        print(f"   Résultat: {r1}")
+        page.wait_for_timeout(2000)
 
-        # 3e. Autocomplete ville : taper la ville et sélectionner la suggestion
-        city_short = VILLE_TEST["value"].split(",")[0]
-        ville_input = page.locator('input[name="ville[autocomplete][textfield]"]')
-        ville_input.fill(city_short[:8])  # Premiers caractères pour déclencher l'autocomplete
-        print(f"  Ville tapée: '{city_short[:8]}', attente autocomplete...")
-        page.wait_for_timeout(3000)
+        ids_p1 = set(r1.get("ids", [])) if r1.get("ok") else set()
 
-        # Chercher les suggestions autocomplete
-        suggestion_selectors = [
-            '.ui-autocomplete .ui-menu-item',
-            '.ui-menu .ui-menu-item',
-            '[role="listbox"] [role="option"]',
-            '.autocomplete li',
-            'ul.ui-autocomplete li',
-        ]
-        suggestion_found = False
-        for sel in suggestion_selectors:
-            try:
-                suggestions = page.locator(sel)
-                count = suggestions.count()
-                print(f"  Suggestions ({sel}): {count}")
-                if count > 0:
-                    # Afficher le texte des suggestions
-                    for i in range(min(3, count)):
-                        txt = suggestions.nth(i).text_content()
-                        print(f"    [{i}] {txt!r}")
-                    suggestions.first.click(timeout=3000)
-                    suggestion_found = True
-                    print(f"  Suggestion cliquée (sélecteur: {sel})")
-                    page.wait_for_timeout(1000)
-                    break
-            except Exception as e:
-                print(f"  Sélecteur {sel} : {e}")
+        # ── 4. Page 2 si on en a besoin ────────────────────────────────────────
+        r2 = None
+        if r1.get("ok") and nb_total > 60:
+            print("\n4. Requête AJAX page 2...")
+            r2 = ajax_via_browser(page, fbid, 2, date_start, date_end)
+            print(f"   Résultat: {r2}")
+            page.wait_for_timeout(2000)
 
-        if not suggestion_found:
-            print("  Aucune suggestion trouvée — injection JS forcée + removeDisabled")
-            # Fallback : injecter les valeurs et forcer l'activation du bouton
-            page.evaluate("""(v) => {
-                const fields = {
-                    "ville[autocomplete][value_container][value_field]": v.value,
-                    "ville[autocomplete][value_container][label_field]": v.label,
-                    "ville[autocomplete][value_container][lat_field]":   v.lat,
-                    "ville[autocomplete][value_container][lng_field]":   v.lng,
-                };
-                for (const [n, val] of Object.entries(fields)) {
-                    const el = document.querySelector(`[name='${n}']`);
-                    if (el) { el.value = val; el.dispatchEvent(new Event('change', {bubbles:true})); }
-                }
-                const btn = document.querySelector('[name="submit_main"]');
-                if (btn) { btn.removeAttribute('disabled'); btn.disabled = false; }
-            }""", VILLE_TEST)
+        # ── 5. Refresh fbid et tester avec un nouveau fbid ─────────────────────
+        print("\n5. Refresh form_build_id et re-test page 1...")
+        page.reload(wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_timeout(5000)
+        fbid2 = page.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value || ''")
+        print(f"   Nouveau fbid: {fbid2[:40]}...")
 
-        # Vérifier si le bouton est maintenant activé
-        btn_state = page.evaluate("""() => {
-            const btn = document.querySelector('[name="submit_main"]');
-            return {found: !!btn, disabled: btn?.disabled, disabledAttr: btn?.getAttribute('disabled')};
-        }""")
-        print(f"  Bouton submit: {btn_state}")
-
-        # ── 4. Soumettre ───────────────────────────────────────────────────────
-        print("\n4. Clic Rechercher...")
-        if not btn_state.get("disabled", True):
-            page.locator('[name="submit_main"]').first.click(timeout=5000)
-            print("  Click via locator")
-        else:
-            # Forcer le click même si disabled
-            page.locator('[name="submit_main"]').first.click(force=True, timeout=5000)
-            print("  Click forcé (force=True)")
-        page.wait_for_timeout(15000)
-
-        # ── 5. Screenshot post-submit ──────────────────────────────────────────
-        page.screenshot(path="diag_p0.png")
-        print("  Screenshot page 0 sauvegardé.")
-
-        # ── 6. Inspecter la pagination ─────────────────────────────────────────
-        print("\n5. Inspection pagination...")
-        pager_info = page.evaluate("""() => {
-            // Chercher la pagination avec plusieurs sélecteurs courants
-            const candidates = [
-                '.pager', '.pager--below', 'nav.pager', 'ul.pager',
-                '.pagination', 'nav[role="navigation"]',
-                '[class*="pager"]', '[class*="pagination"]',
-            ];
-            let pagerEl = null;
-            for (const sel of candidates) {
-                pagerEl = document.querySelector(sel);
-                if (pagerEl) break;
-            }
-            // Chercher "suivant" dans tous les liens
-            const allLinks = [...document.querySelectorAll('a')];
-            const nextLinks = allLinks.filter(a =>
-                a.textContent.toLowerCase().includes('suivant') ||
-                a.getAttribute('title')?.toLowerCase().includes('suivant') ||
-                a.getAttribute('rel') === 'next' ||
-                a.textContent.trim() === '>' ||
-                a.textContent.trim() === '›' ||
-                a.textContent.trim() === '»'
-            );
-            return {
-                pagerFound:    !!pagerEl,
-                pagerSelector: candidates.find(sel => document.querySelector(sel)) || null,
-                pagerHtml:     pagerEl?.outerHTML?.substring(0, 800) || null,
-                nextLinks:     nextLinks.map(a => ({text: a.textContent.trim(), href: a.href, title: a.title || ''})).slice(0, 5),
-            };
-        }""")
-        print(f"  Pager trouvé: {pager_info['pagerFound']} (sélecteur: {pager_info['pagerSelector']})")
-        print(f"  Liens 'suivant': {pager_info['nextLinks']}")
-        if pager_info["pagerHtml"]:
-            print(f"  Pager HTML: {pager_info['pagerHtml']}")
-
-        # ── 7. Cliquer "page suivante" ─────────────────────────────────────────
-        if intercepted and intercepted[0]["nb_total"] > 30:
-            print(f"\n6. Clic page suivante (nb_total={intercepted[0]['nb_total']} > 30)...")
-            click_result = page.evaluate("""() => {
-                const selectors = [
-                    'li.pager__item--next a', '.pager-next a', '.pager--next a',
-                    'a[rel="next"]', 'a[title*="suivant"]', 'a[title*="Suivant"]',
-                    '.pagination .next a', 'li.next a',
-                ];
-                for (const sel of selectors) {
-                    const el = document.querySelector(sel);
-                    if (el) { el.click(); return {clicked: true, sel, text: el.textContent.trim(), href: el.href}; }
-                }
-                // Fallback : texte "›", "»", ">", "suivant"
-                for (const a of document.querySelectorAll('a')) {
-                    const t = a.textContent.trim().toLowerCase();
-                    if (t === '›' || t === '»' || t === '>' || t === 'suivant' || t === 'page suivante') {
-                        a.click();
-                        return {clicked: true, sel: 'text', text: a.textContent.trim(), href: a.href};
-                    }
-                }
-                return {clicked: false, reason: 'bouton non trouvé'};
-            }""")
-            print(f"  Clic: {click_result}")
-            page.wait_for_timeout(8000)
-            page.screenshot(path="diag_p1.png")
-            print("  Screenshot page 1 sauvegardé.")
-        else:
-            reason = "pas assez de résultats" if not intercepted else f"nb_total={intercepted[0]['nb_total']} ≤ 30"
-            print(f"\n6. Pas de clic page suivante ({reason})")
-
-        # ── 8. Extraire un échantillon DOM de carte tournoi ───────────────────
-        print("\n7. Extraction HTML carte tournoi (structure DOM)...")
-        card_info = page.evaluate("""() => {
-            // Chercher les cards de résultat
-            const candidates = [
-                '.views-row', '.card', '.tournoi', '[class*="result"]',
-                '.view-content > *', 'article', '.node',
-            ];
-            for (const sel of candidates) {
-                const els = document.querySelectorAll(sel);
-                if (els.length > 2) {
-                    return {
-                        selector: sel,
-                        count: els.length,
-                        sample: els[0]?.outerHTML?.substring(0, 1000) || '',
-                    };
-                }
-            }
-            // Dernier recours: premier enfant du main/article
-            const main = document.querySelector('main, #main, .main, #content');
-            return {
-                selector: 'none found',
-                count: 0,
-                bodySnippet: main?.innerHTML?.substring(0, 2000) || document.body.innerHTML.substring(0, 2000),
-            };
-        }""")
-        print(f"  Cards: {card_info.get('count')} (sélecteur: {card_info.get('selector')})")
-        if card_info.get("sample"):
-            print(f"  Sample HTML:\n{card_info['sample'][:600]}")
-        elif card_info.get("bodySnippet"):
-            print(f"  Body snippet:\n{card_info['bodySnippet'][:800]}")
+        r1_fresh = None
+        if fbid2 and fbid2 != fbid:
+            print("   Test page 0 avec fbid frais...")
+            r0_fresh = ajax_via_browser(page, fbid2, 0, date_start, date_end)
+            print(f"   Page 0 (fbid frais): {r0_fresh}")
+            page.wait_for_timeout(2000)
+            print("   Test page 1 avec fbid frais...")
+            r1_fresh = ajax_via_browser(page, fbid2, 1, date_start, date_end)
+            print(f"   Page 1 (fbid frais): {r1_fresh}")
 
         browser.close()
 
@@ -319,48 +201,47 @@ def main():
     print("\n" + "=" * 60)
     print("ANALYSE FINALE")
     print("=" * 60)
-    print(f"Réponses AJAX interceptées : {len(intercepted)}")
 
-    for entry in intercepted:
-        print(f"  Page {entry['page_num']}: {entry['count']} items, nb_total={entry['nb_total']}, "
-              f"first_id={entry['ids'][0] if entry['ids'] else 'N/A'}")
+    print(f"\nPage 0 : {len(ids_p0)} items (nb_total={nb_total})")
 
-    if len(intercepted) >= 2:
-        set0 = set(intercepted[0]["ids"])
-        set1 = set(intercepted[1]["ids"])
-        overlap   = len(set0 & set1)
-        new_in_p1 = len(set1 - set0)
-        pct_new   = new_in_p1 / len(set1) * 100 if set1 else 0
+    if r1.get("ok"):
+        ids_p1 = set(r1["ids"])
+        overlap   = len(ids_p0 & ids_p1)
+        new_in_p1 = len(ids_p1 - ids_p0)
+        print(f"Page 1 : {len(ids_p1)} items")
+        print(f"  Chevauchement avec page 0 : {overlap}/{len(ids_p0)}")
+        print(f"  Nouveaux items en page 1   : {new_in_p1}")
+        print(f"  Premiers IDs page 1: {r1['ids'][:5]}")
 
-        print(f"\nComparaison page 0 vs page 1 :")
-        print(f"  Page 0 : {len(set0)} items")
-        print(f"  Page 1 : {len(set1)} items")
-        print(f"  Chevauchement : {overlap}")
-        print(f"  Nouveaux dans page 1 : {new_in_p1} ({pct_new:.0f}%)")
-
-        if overlap == len(set0) and overlap == len(set1):
-            print("\n→ RÉSULTAT : PAGINATION CASSÉE — page 1 == page 0 (mêmes 30 items)")
-            print("  La piste 4 DOM ne résout pas le problème fondamental.")
-            print("  → Envisager piste 5 (couverture géographique) ou combiner toutes pistes précédentes.")
+        if ids_p0 == ids_p1:
+            print("\n→ RÉSULTAT : PAGINATION CASSÉE (page 1 == page 0, même depuis browser)")
+            print("  Le problème est côté serveur Ten'Up, pas dans notre requests.Session.")
+            print("  Piste 4 (DOM) ne résout pas le problème fondamental.")
         elif new_in_p1 > 0:
-            print(f"\n→ RÉSULTAT : PAGINATION FONCTIONNE !")
-            print(f"  {new_in_p1} nouveaux items en page 1 ({pct_new:.0f}% différents)")
-            print("  → Écrire scraper_france_v7.py basé sur Playwright DOM + navigation réelle.")
+            print(f"\n→ RÉSULTAT : PAGINATION FONCTIONNE DEPUIS LE BROWSER !")
+            print(f"  {new_in_p1} items nouveaux en page 1 → requests.Session manquait quelque chose.")
+            print("  Solution : utiliser page.evaluate(fetch) dans le scraper v7 pour paginer.")
         else:
-            print(f"\n→ RÉSULTAT AMBIGU : à analyser manuellement.")
-
-    elif len(intercepted) == 1:
-        e = intercepted[0]
-        print(f"\nUne seule page AJAX ({e['count']} items, nb_total={e['nb_total']})")
-        if e["nb_total"] <= 30:
-            print("  Normal : < 30 résultats pour cette ville/rayon.")
-        else:
-            print("  Soumission OK mais page suivante non trouvée/cliquée.")
-            print("  → Inspecter les screenshots et le pager HTML pour trouver le bon sélecteur.")
+            print("\n→ RÉSULTAT AMBIGU")
     else:
-        print("\nAucune réponse AJAX capturée.")
-        print("  → La soumission du formulaire a probablement échoué.")
-        print("  → Inspecter la section 'Formulaire' et 'Submit' dans les logs ci-dessus.")
+        print(f"Page 1 : ÉCHEC — {r1}")
+
+    if r2 and r2.get("ok"):
+        ids_p2 = set(r2["ids"])
+        overlap_p2 = len(ids_p0 & ids_p2)
+        print(f"\nPage 2 : {len(ids_p2)} items, overlap avec p0={overlap_p2}")
+
+    if r1_fresh:
+        if r1_fresh.get("ok"):
+            ids_p1f = set(r1_fresh["ids"])
+            overlap_f = len(ids_p0 & ids_p1f)
+            print(f"\nPage 1 (fbid frais) : {len(ids_p1f)} items, overlap avec p0={overlap_f}")
+            if ids_p0 == ids_p1f:
+                print("  → Même résultat avec fbid frais : pagination vraiment cassée")
+            elif len(ids_p1f - ids_p0) > 0:
+                print(f"  → {len(ids_p1f - ids_p0)} items nouveaux avec fbid frais !")
+        else:
+            print(f"\nPage 1 (fbid frais) : ÉCHEC — {r1_fresh}")
 
 
 if __name__ == "__main__":
