@@ -127,17 +127,21 @@ def main():
         print(f"  Critères cochés: {checked_result['ok']}, non trouvés: {checked_result['notFound'][:5]}")
 
         # ── 4. Soumettre ───────────────────────────────────────────────────────
-        print("\n4. Clic Rechercher...")
-        submit_result = page.evaluate("""() => {
-            const btn = document.querySelector('[name="submit_main"]') ||
-                        document.querySelector('input[value="Rechercher"]') ||
-                        document.querySelector('input[type="submit"]');
-            if (!btn) return {found: false};
-            btn.click();
-            return {found: true, name: btn.name, value: btn.value};
-        }""")
+        # IMPORTANT : utiliser page.locator().click() (pas evaluate) pour déclencher
+        # les event listeners jQuery Drupal (mousedown/mouseup/click)
+        print("\n4. Clic Rechercher (Playwright natif)...")
+        btn_locator = page.locator('[name="submit_main"]').first
+        btn_found = btn_locator.count() > 0
+        submit_result = {"found": btn_found}
+        if btn_found:
+            btn_locator.click()
+            submit_result["clicked"] = True
+        else:
+            # Fallback : submit le formulaire entier
+            page.locator("form#recherche-tournois-form").evaluate("f => f.submit()")
+            submit_result["fallback"] = "form.submit()"
         print(f"  Submit: {submit_result}")
-        page.wait_for_timeout(10000)
+        page.wait_for_timeout(15000)
 
         # ── 5. Screenshot post-submit ──────────────────────────────────────────
         page.screenshot(path="diag_p0.png")
