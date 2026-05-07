@@ -186,35 +186,69 @@ def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
 
 
 def scrape_ville(session, fbid, ville, date_start, date_end):
-    """Scrape tous les tournois d'une ville (avec pagination si elle fonctionne)."""
+    """
+    Scrape tous les tournois d'une ville avec pagination robuste.
+    Gestion des cas :
+    - page 0 vide (fallback page 1)
+    - pagination cyclique (détection par first_id et new_count)
+    - pages incomplètes (< 30 items = dernière page)
+    """
     name = ville["ville_value"].split(",")[0]
     all_items = {}
+    page_first_ids = []  # premier ID de chaque page, pour détecter les cycles
 
+    # Page 0
     items0, nb_total = ajax_ville_page(session, fbid, ville, date_start, date_end, 0)
+
+    # Fallback : si page 0 vide mais nb_total > 0, essayer page 1
+    if not items0 and nb_total == 0:
+        items1, nb_total1 = ajax_ville_page(session, fbid, ville, date_start, date_end, 1)
+        if items1:
+            print(f"  {name} : page 0 vide, démarrage page 1 (nb={nb_total1})")
+            items0, nb_total = items1, nb_total1
+
     for it in items0:
         all_items[str(it.get("id", ""))] = it
+    if items0:
+        page_first_ids.append(str(items0[0].get("id", "")))
 
     if nb_total == 0:
         return list(all_items.values()), 0
 
     nb_pages = math.ceil(nb_total / 30)
-    if nb_pages > 1:
-        for page_num in range(1, min(nb_pages, 50)):  # max 50 pages par ville
-            items, _ = ajax_ville_page(session, fbid, ville, date_start, date_end, page_num)
-            if not items:
-                break
-            new_count = 0
-            for it in items:
-                tid = str(it.get("id", ""))
-                if tid and tid not in all_items:
-                    all_items[tid] = it
-                    new_count += 1
-            if new_count == 0:
-                break  # pagination cyclique détectée
-            time.sleep(0.2)
+    # Toujours tenter la pagination (même si nb_pages=1, server peut retourner plus)
+    # Cap à 200 pages max par ville (~6000 résultats max)
+    start_page = 2 if (items0 and page_first_ids) else 1
+    for page_num in range(start_page, min(nb_pages + 1, 201)):
+        items, _ = ajax_ville_page(session, fbid, ville, date_start, date_end, page_num)
+        if not items:
+            break
+
+        first_id = str(items[0].get("id", ""))
+
+        # Détecter pagination cyclique : le premier item de cette page est déjà apparu
+        if first_id in page_first_ids:
+            break
+        page_first_ids.append(first_id)
+
+        new_count = 0
+        for it in items:
+            tid = str(it.get("id", ""))
+            if tid and tid not in all_items:
+                all_items[tid] = it
+                new_count += 1
+
+        if new_count == 0:
+            break  # tous les items déjà vus (cycle sans new first_id)
+
+        # Si page incomplète (<30) : probablement la dernière
+        if len(items) < 30:
+            break
+
+        time.sleep(0.25)
 
     if nb_total > 0:
-        print(f"  {name} ({RAYON}km) : {nb_total} résultats → {len(all_items)} uniques")
+        print(f"  {name} ({RAYON}km) : {nb_total} résultats → {len(all_items)} uniques ({len(page_first_ids)} pages)")
     return list(all_items.values()), nb_total
 
 
