@@ -216,10 +216,9 @@ def scrape_ville(session, fbid, ville, date_start, date_end):
         return list(all_items.values()), 0
 
     nb_pages = math.ceil(nb_total / 30)
-    # Toujours tenter la pagination (même si nb_pages=1, server peut retourner plus)
+    # Toujours tenter la pagination à partir de page 1
     # Cap à 200 pages max par ville (~6000 résultats max)
-    start_page = 2 if (items0 and page_first_ids) else 1
-    for page_num in range(start_page, min(nb_pages + 1, 201)):
+    for page_num in range(1, min(nb_pages + 1, 201)):
         items, _ = ajax_ville_page(session, fbid, ville, date_start, date_end, page_num)
         if not items:
             break
