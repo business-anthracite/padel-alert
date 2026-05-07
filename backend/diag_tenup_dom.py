@@ -81,6 +81,19 @@ def main():
         print(f"   fbid initial: {fbid_initial[:50]}...")
         print(f"   Requêtes AJAX capturées au chargement: {len(ajax_results)}")
 
+        # Supprimer la bannière RGPD qui intercepte les clics
+        removed = page.evaluate("""() => {
+            let count = 0;
+            ['privacy-overlay', 'cookie-overlay', 'tc-privacy-overlay'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.remove(); count++; }
+            });
+            document.querySelectorAll('.tc-privacy-overlay, .tc-reset-css, [id*="privacy"], [class*="tc-privacy"]')
+                .forEach(el => { el.remove(); count++; });
+            return count;
+        }""")
+        print(f"   Éléments overlay supprimés: {removed}")
+
         # ── 2. Remplir le formulaire via jQuery ───────────────────────────────
         print("\n2. Remplissage formulaire via jQuery...")
 
