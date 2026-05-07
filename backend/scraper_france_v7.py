@@ -97,6 +97,8 @@ def ajax_france_page(session, fbid, page_num, date_start, date_end):
         trigger_name  = "submit_page"
         trigger_value = "Submit page"
 
+    # Pas de critères (epreuve/age/type/famille) : le serveur retourne TOUS les
+    # tournois padel. Envoyer des critères spécifiques filtre et réduit les résultats.
     data = {
         "recherche_type": "ligue",
         "ville[autocomplete][country]": "fr",
@@ -112,7 +114,6 @@ def ajax_france_page(session, fbid, page_num, date_start, date_end):
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        **NEW_CRITERIA,
         "sort": "_DIST_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  trigger_name,
