@@ -1,20 +1,18 @@
 """
-Padel Alert — Scraper France v7 — pagination réelle via submit_page
+Padel Alert — Scraper France v7 — ligue + pagination réelle
 
-Découverte clé (07/05/2026) :
-  La pagination Ten'Up fonctionne si on envoie
-    _triggering_element_name  = submit_page   (au lieu de submit_main)
-    _triggering_element_value = Submit page
-  pour toutes les requêtes page > 0. Drupal navigue alors dans les résultats
-  en session au lieu de relancer une nouvelle recherche.
+Architecture finale (07/05/2026) :
+  1. recherche_type = ligue (France entière, sans filtrer par ligue/comité)
+  2. Page 0 → _triggering_element_name = submit_main
+  3. Pages 1+ → _triggering_element_name = submit_page (clé de la pagination)
+  → Drupal navigue dans les résultats en session au lieu de relancer une recherche
+  → Couverture 100% garantie, aucune zone géographique manquante
 
-Architecture : 43 communes + 100km + pagination complète.
-Couverture : 100% des tournois padel France (vs ~80% en v6 avec offsets).
+Découverte du mécanisme le 07/05/2026 grâce au payload DevTools du vrai navigateur.
 """
 import os, json, math, subprocess, time
 from datetime import datetime, timedelta
 import requests
-from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 OUTPUT_FILE  = "data/tournaments.json"
@@ -22,7 +20,6 @@ TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
 HORIZON_DAYS = 90
-RAYON        = "100"
 RETRY_MAX    = 3
 
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
@@ -47,65 +44,6 @@ NEW_CRITERIA = {
     "surface[B_PIL]": "B_PIL", "surface[DUR  ]": "DUR  ",
     "surface[GAZON]": "GAZON", "surface[AUTRE]": "AUTRE",
 }
-
-VILLES_FRANCE = [
-    # Hauts-de-France
-    {"ville_value": "Montdidier, 80500",          "ville_label": "Montdidier, 80, Somme, Hauts-de-France",                               "lat": "49.6483",  "lng": "2.5711"},
-    {"ville_value": "Bouquemaison, 62270",         "ville_label": "Bouquemaison, 62, Pas-de-Calais, Hauts-de-France",                     "lat": "50.2167",  "lng": "2.3000"},
-    # Grand Est
-    {"ville_value": "Charleville-Mézières, 08000","ville_label": "Charleville-Mézières, 08, Ardennes, Grand Est",                        "lat": "49.7716",  "lng": "4.7158"},
-    {"ville_value": "Bar-le-Duc, 55000",           "ville_label": "Bar-le-Duc, 55, Meuse, Grand Est",                                     "lat": "48.7728",  "lng": "5.1639"},
-    {"ville_value": "Marigny-le-Châtel, 10350",    "ville_label": "Marigny-le-Châtel, 10, Aube, Grand Est",                               "lat": "48.3333",  "lng": "3.8167"},
-    {"ville_value": "Vahl-lès-Bénestroff, 57670",  "ville_label": "Vahl-lès-Bénestroff, 57, Moselle, Grand Est",                          "lat": "48.9167",  "lng": "6.8667"},
-    {"ville_value": "Mulhouse, 68100",             "ville_label": "Mulhouse, 68, Haut-Rhin, Grand Est",                                   "lat": "47.7508",  "lng": "7.3359"},
-    # Normandie
-    {"ville_value": "Flers, 61100",                "ville_label": "Flers, 61, Orne, Normandie",                                           "lat": "48.7469",  "lng": "-0.5738"},
-    {"ville_value": "Saint-Lô, 50000",             "ville_label": "Saint-Lô, 50, Manche, Normandie",                                     "lat": "49.1167",  "lng": "-1.0833"},
-    {"ville_value": "Bernay, 27300",               "ville_label": "Bernay, 27, Eure, Normandie",                                         "lat": "49.0863",  "lng": "0.5993"},
-    # Bretagne
-    {"ville_value": "Châteaulin, 29150",           "ville_label": "Châteaulin, 29, Finistère, Bretagne",                                  "lat": "48.1942",  "lng": "-4.0842"},
-    {"ville_value": "Pontivy, 56300",              "ville_label": "Pontivy, 56, Morbihan, Bretagne",                                      "lat": "48.0714",  "lng": "-2.9736"},
-    # Pays de la Loire
-    {"ville_value": "Ancenis-Saint-Géréon, 44150", "ville_label": "Ancenis-Saint-Géréon, 44, Loire-Atlantique, Pays de la Loire",         "lat": "47.3667",  "lng": "-1.1667"},
-    {"ville_value": "Fontenay-le-Comte, 85200",    "ville_label": "Fontenay-le-Comte, 85, Vendée, Pays de la Loire",                     "lat": "46.4677",  "lng": "-0.8076"},
-    # Centre-Val de Loire
-    {"ville_value": "Orléans, 45000",              "ville_label": "Orléans, 45, Loiret, Centre-Val de Loire",                            "lat": "47.9027",  "lng": "1.9090"},
-    {"ville_value": "Tours, 37000",                "ville_label": "Tours, 37, Indre-et-Loire, Centre-Val de Loire",                      "lat": "47.3941",  "lng": "0.6848"},
-    {"ville_value": "Châteauroux, 36000",          "ville_label": "Châteauroux, 36, Indre, Centre-Val de Loire",                         "lat": "46.8113",  "lng": "1.6924"},
-    # Île-de-France
-    {"ville_value": "Montereau-Fault-Yonne, 77130","ville_label": "Montereau-Fault-Yonne, 77, Seine-et-Marne, Île-de-France",            "lat": "48.3833",  "lng": "2.9500"},
-    # Bourgogne-Franche-Comté
-    {"ville_value": "Besançon, 25000",             "ville_label": "Besançon, 25, Doubs, Bourgogne-Franche-Comté",                        "lat": "47.2378",  "lng": "6.0241"},
-    {"ville_value": "Chalon-sur-Saône, 71100",     "ville_label": "Chalon-sur-Saône, 71, Saône-et-Loire, Bourgogne-Franche-Comté",       "lat": "46.7786",  "lng": "4.8537"},
-    # Nouvelle-Aquitaine
-    {"ville_value": "Ruffec, 16700",               "ville_label": "Ruffec, 16, Charente, Nouvelle-Aquitaine",                            "lat": "46.0333",  "lng": "0.1833"},
-    {"ville_value": "Saintes, 17100",              "ville_label": "Saintes, 17, Charente-Maritime, Nouvelle-Aquitaine",                  "lat": "45.7470",  "lng": "-0.6319"},
-    {"ville_value": "Tulle, 19000",                "ville_label": "Tulle, 19, Corrèze, Nouvelle-Aquitaine",                              "lat": "45.2688",  "lng": "1.7726"},
-    {"ville_value": "Périgueux, 24000",            "ville_label": "Périgueux, 24, Dordogne, Nouvelle-Aquitaine",                         "lat": "45.1854",  "lng": "0.7218"},
-    {"ville_value": "Morcenx-la-Nouvelle, 40110",  "ville_label": "Morcenx-la-Nouvelle, 40, Landes, Nouvelle-Aquitaine",                 "lat": "44.0342",  "lng": "-0.9131"},
-    {"ville_value": "Oloron-Sainte-Marie, 64400",  "ville_label": "Oloron-Sainte-Marie, 64, Pyrénées-Atlantiques, Nouvelle-Aquitaine",   "lat": "43.1942",  "lng": "-0.6058"},
-    # Auvergne-Rhône-Alpes
-    {"ville_value": "Aurouër, 03460",              "ville_label": "Aurouër, 03, Allier, Auvergne-Rhône-Alpes",                           "lat": "46.7167",  "lng": "3.3167"},
-    {"ville_value": "Évaux-les-Bains, 23110",      "ville_label": "Évaux-les-Bains, 23, Creuse, Nouvelle-Aquitaine",                     "lat": "46.1764",  "lng": "2.4792"},
-    {"ville_value": "Brioude, 43100",              "ville_label": "Brioude, 43, Haute-Loire, Auvergne-Rhône-Alpes",                      "lat": "45.2952",  "lng": "3.3830"},
-    {"ville_value": "Saint-Maurice-de-Lignon, 43200","ville_label": "Saint-Maurice-de-Lignon, 43, Haute-Loire, Auvergne-Rhône-Alpes",    "lat": "45.2167",  "lng": "4.0833"},
-    {"ville_value": "Saint-François-de-Sales, 73700","ville_label": "Saint-François-de-Sales, 73, Savoie, Auvergne-Rhône-Alpes",         "lat": "45.6833",  "lng": "6.3167"},
-    {"ville_value": "Montélimar, 26200",           "ville_label": "Montélimar, 26, Drôme, Auvergne-Rhône-Alpes",                        "lat": "44.5567",  "lng": "4.7492"},
-    # Provence-Alpes-Côte d'Azur
-    {"ville_value": "Pertuis, 84120",              "ville_label": "Pertuis, 84, Vaucluse, Provence-Alpes-Côte d'Azur",                   "lat": "43.6942",  "lng": "5.5028"},
-    {"ville_value": "Thorame-Basse, 04170",        "ville_label": "Thorame-Basse, 04, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur","lat": "44.0833","lng": "6.4833"},
-    # Occitanie
-    {"ville_value": "Cahors, 46000",               "ville_label": "Cahors, 46, Lot, Occitanie",                                          "lat": "44.4484",  "lng": "1.4411"},
-    {"ville_value": "Tarbes, 65000",               "ville_label": "Tarbes, 65, Hautes-Pyrénées, Occitanie",                              "lat": "43.2333",  "lng": "0.0783"},
-    {"ville_value": "Albi, 81000",                 "ville_label": "Albi, 81, Tarn, Occitanie",                                           "lat": "43.9267",  "lng": "2.1483"},
-    {"ville_value": "Lodève, 34700",               "ville_label": "Lodève, 34, Hérault, Occitanie",                                      "lat": "43.7319",  "lng": "3.3195"},
-    {"ville_value": "Foix, 09000",                 "ville_label": "Foix, 09, Ariège, Occitanie",                                         "lat": "42.9647",  "lng": "1.6064"},
-    {"ville_value": "Perpignan, 66000",            "ville_label": "Perpignan, 66, Pyrénées-Orientales, Occitanie",                       "lat": "42.6983",  "lng": "2.8954"},
-    # Corse
-    {"ville_value": "Ajaccio, 20000",              "ville_label": "Ajaccio, 20, Corse-du-Sud, Corse",                                    "lat": "41.9197",  "lng": "8.7386"},
-    {"ville_value": "Porto-Vecchio, 20137",        "ville_label": "Porto-Vecchio, 20, Corse-du-Sud, Corse",                              "lat": "41.5928",  "lng": "9.2794"},
-    {"ville_value": "Corte, 20250",                "ville_label": "Corte, 20, Haute-Corse, Corse",                                       "lat": "42.3064",  "lng": "9.1498"},
-]
 
 
 # ── Session ────────────────────────────────────────────────────────────────────
@@ -144,13 +82,13 @@ def make_session(cookies):
     return s
 
 
-# ── AJAX ───────────────────────────────────────────────────────────────────────
+# ── AJAX France entière ────────────────────────────────────────────────────────
 
-def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
+def ajax_france_page(session, fbid, page_num, date_start, date_end):
     """
-    AJAX pour une ville, une page.
-    page=0 → submit_main (nouvelle recherche)
-    page>0 → submit_page (pagination dans les résultats en session)
+    AJAX recherche_type=ligue, France entière (toutes ligues, tous comités).
+    page=0 → submit_main (initialise la recherche en session Drupal)
+    page>0 → submit_page (navigue dans les résultats en session)
     """
     if page_num == 0:
         trigger_name  = "submit_main"
@@ -160,14 +98,17 @@ def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
         trigger_value = "Submit page"
 
     data = {
-        "recherche_type": "ville",
+        "recherche_type": "ligue",
         "ville[autocomplete][country]": "fr",
         "ville[autocomplete][textfield]": "",
-        "ville[autocomplete][value_container][value_field]": ville["ville_value"],
-        "ville[autocomplete][value_container][label_field]": ville["ville_label"],
-        "ville[autocomplete][value_container][lat_field]":   ville["lat"],
-        "ville[autocomplete][value_container][lng_field]":   ville["lng"],
-        "ville[distance][value_field]": RAYON,
+        "ville[autocomplete][value_container][value_field]": "",
+        "ville[autocomplete][value_container][label_field]": "",
+        "ville[autocomplete][value_container][lat_field]": "",
+        "ville[autocomplete][value_container][lng_field]": "",
+        "ville[distance][value_field]": "0",
+        "club[autocomplete][textfield]": "",
+        "club[autocomplete][value_container][value_field]": "",
+        "club[autocomplete][value_container][label_field]": "",
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
@@ -179,9 +120,10 @@ def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
         "form_build_id": fbid,
         "page": str(page_num),
     }
+
     for attempt in range(1, RETRY_MAX + 1):
         try:
-            resp = session.post(TENUP_AJAX, data=data, timeout=45)
+            resp = session.post(TENUP_AJAX, data=data, timeout=60)
             resp.raise_for_status()
             for cmd in resp.json():
                 if isinstance(cmd, dict) and cmd.get("command") == "recherche_tournois_update":
@@ -191,53 +133,8 @@ def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
         except Exception as e:
             print(f"    Erreur page {page_num} attempt {attempt}: {e}")
             if attempt < RETRY_MAX:
-                time.sleep(2 * attempt)
+                time.sleep(3 * attempt)
     return [], 0
-
-
-# ── Scraping d'une ville ───────────────────────────────────────────────────────
-
-def scrape_ville(session, fbid, ville, date_start, date_end):
-    """
-    Scrape TOUS les tournois d'une ville en paginant avec submit_page.
-    Garantit 100% de couverture pour n'importe quel nombre de résultats.
-    """
-    name = ville["ville_value"].split(",")[0]
-    all_items = {}
-
-    # Page 0 : initialise la recherche en session
-    items0, nb_total = ajax_ville_page(session, fbid, ville, date_start, date_end, 0)
-
-    # Fallback si page 0 vide (fbid parfois consommé par la page au chargement)
-    if not items0 and nb_total == 0:
-        items0, nb_total = ajax_ville_page(session, fbid, ville, date_start, date_end, 1)
-
-    for it in items0:
-        all_items[str(it.get("id", ""))] = it
-
-    if nb_total == 0:
-        return list(all_items.values()), 0
-
-    # Pages suivantes via submit_page
-    if nb_total > 30:
-        nb_pages = math.ceil(nb_total / 30)
-        for page_num in range(1, nb_pages + 2):  # +2 marge de sécurité
-            items, _ = ajax_ville_page(session, fbid, ville, date_start, date_end, page_num)
-            if not items:
-                break
-            new_count = 0
-            for it in items:
-                tid = str(it.get("id", ""))
-                if tid and tid not in all_items:
-                    all_items[tid] = it
-                    new_count += 1
-            if new_count == 0:
-                break
-            time.sleep(0.3)
-
-    coverage = f"{len(all_items)}/{nb_total}" if nb_total else "0"
-    print(f"  {name} ({RAYON}km) : {nb_total} résultats → {len(all_items)} scrapés [{coverage}]")
-    return list(all_items.values()), nb_total
 
 
 # ── Parsing ────────────────────────────────────────────────────────────────────
@@ -316,38 +213,61 @@ def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
     date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v7 — {len(VILLES_FRANCE)} villes ({date_start}→{date_end})")
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v7 ligue ({date_start}→{date_end})")
 
     fbid, cookies = get_session()
     session = make_session(cookies)
 
-    all_raw = {}
-    stats   = {}
+    all_raw  = {}  # tenup_id → item brut
 
-    for i, ville in enumerate(VILLES_FRANCE, 1):
-        items, nb_total = scrape_ville(session, fbid, ville, date_start, date_end)
-        name = ville["ville_value"].split(",")[0]
-        stats[name] = {"nb_total": nb_total, "scraped": len(items)}
-        for item in items:
-            tid = str(item.get("id", ""))
+    # ── Page 0 : initialise la recherche France entière ────────────────────────
+    print("Scraping page 0 (submit_main)...")
+    items0, nb_total = ajax_france_page(session, fbid, 0, date_start, date_end)
+
+    # Fallback si page 0 vide (fbid parfois consommé par le chargement de la page)
+    if not items0 and nb_total == 0:
+        print("  Page 0 vide — fallback page 1 (submit_page)...")
+        items0, nb_total = ajax_france_page(session, fbid, 1, date_start, date_end)
+
+    for it in items0:
+        all_raw[str(it.get("id", ""))] = it
+
+    print(f"  Page 0 : {len(items0)} items, nb_total={nb_total}")
+
+    if nb_total == 0:
+        print("ERREUR : aucun résultat. Arrêt.")
+        return
+
+    # ── Pages suivantes via submit_page ────────────────────────────────────────
+    nb_pages = math.ceil(nb_total / 30)
+    print(f"Pagination : {nb_pages} pages estimées ({nb_total} tournois)")
+
+    start_page = 1 if items0 else 2  # si fallback p1 déjà fait, commencer à p2
+    for page_num in range(start_page, nb_pages + 3):  # +3 marge de sécurité
+        items, _ = ajax_france_page(session, fbid, page_num, date_start, date_end)
+        if not items:
+            print(f"  Page {page_num} : vide — arrêt")
+            break
+        new_count = 0
+        for it in items:
+            tid = str(it.get("id", ""))
             if tid and tid not in all_raw:
-                all_raw[tid] = item
-        if i % 10 == 0:
-            elapsed = (datetime.now() - now).total_seconds()
-            print(f"  [{i}/{len(VILLES_FRANCE)}] {len(all_raw)} uniques ({elapsed:.0f}s)")
+                all_raw[tid] = it
+                new_count += 1
+        print(f"  Page {page_num}/{nb_pages} : {len(items)} items, {new_count} nouveaux (total: {len(all_raw)})")
+        if new_count == 0:
+            print(f"  Aucun nouveau item — arrêt à la page {page_num}")
+            break
         time.sleep(0.3)
 
+    # ── Parsing & écriture ─────────────────────────────────────────────────────
     tournaments = [t for item in all_raw.values() if (t := parse_item(item))]
 
+    elapsed = (datetime.now() - now).total_seconds()
     print(f"\n{'='*60}")
     print(f"Total France : {len(tournaments)} tournois uniques")
-    print("\nDétail par ville (top 15 par nb résultats) :")
-    undertotal = sum(1 for s in stats.values() if s["scraped"] < s["nb_total"])
-    for name, s in sorted(stats.items(), key=lambda x: -x[1]["nb_total"])[:15]:
-        ok = "✓" if s["scraped"] >= s["nb_total"] else f"⚠ {s['scraped']}/{s['nb_total']}"
-        print(f"  {name}: {s['nb_total']} → {s['scraped']} [{ok}]")
-    if undertotal:
-        print(f"\nATTENTION : {undertotal} villes avec couverture incomplète")
+    print(f"nb_total Ten'Up : {nb_total} | Couverture : {len(all_raw)}/{nb_total} ({len(all_raw)/nb_total*100:.0f}%)" if nb_total else "")
+    print(f"Durée : {elapsed:.0f}s")
 
     os.makedirs("data", exist_ok=True)
     payload = {
@@ -357,7 +277,7 @@ def main():
     }
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"\nFichier écrit : {OUTPUT_FILE}")
+    print(f"Fichier écrit : {OUTPUT_FILE}")
 
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
