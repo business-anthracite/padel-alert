@@ -195,7 +195,8 @@ def coord_offsets(base_lat, base_lng, nb_total):
     """
     if nb_total <= 30:
         return []
-    extra = min(math.ceil(nb_total / 30) - 1, 20)  # max 20 offsets par ville
+    # ~50% de nouveaux résultats par offset → diviser par 15 pour couvrir suffisamment
+    extra = min(math.ceil(nb_total / 15), 20)  # max 20 offsets par ville
     # 8 directions × 4 distances = 32 offsets possibles
     dirs = [(1,0),(-1,0),(0,1),(0,-1),(0.7,0.7),(-0.7,0.7),(0.7,-0.7),(-0.7,-0.7)]
     result = []
