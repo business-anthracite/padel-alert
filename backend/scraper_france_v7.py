@@ -225,9 +225,11 @@ def main():
     items0, nb_total = ajax_france_page(session, fbid, 0, date_start, date_end)
 
     # Fallback si page 0 vide (fbid parfois consommé par le chargement de la page)
+    fallback_used = False
     if not items0 and nb_total == 0:
         print("  Page 0 vide — fallback page 1 (submit_page)...")
         items0, nb_total = ajax_france_page(session, fbid, 1, date_start, date_end)
+        fallback_used = True
 
     for it in items0:
         all_raw[str(it.get("id", ""))] = it
@@ -239,12 +241,11 @@ def main():
         return
 
     # ── Pages suivantes via submit_page ────────────────────────────────────────
-    # Boucle non bornée par nb_total (peut être un plafond d'affichage Ten'Up,
-    # ex : 10 000 alors que le vrai stock est plus grand). Arrêt sur résultat vide.
     nb_pages_est = math.ceil(nb_total / 30) if nb_total else "?"
     print(f"Pagination : ~{nb_pages_est} pages estimées (nb_total={nb_total})")
 
-    start_page = 1 if items0 else 2
+    # Si le fallback a déjà récupéré page 1, démarrer à page 2
+    start_page = 2 if fallback_used else 1
     consecutive_empty = 0
     for page_num in range(start_page, 99999):
         items, _ = ajax_france_page(session, fbid, page_num, date_start, date_end)
