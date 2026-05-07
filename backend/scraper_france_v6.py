@@ -190,14 +190,16 @@ def coord_offsets(base_lat, base_lng, nb_total):
     """
     Génère des centres décalés pour contourner la limite de 30 résultats/requête.
     Avec sort=_DIST_, chaque centre donne un classement différent → 30 autres tournois.
+    Les offsets à 60-100km donnent des résultats peu chevauchants avec l'original
+    (au-delà du croisement où l'ordre des distances change significativement).
     """
     if nb_total <= 30:
         return []
-    extra = min(math.ceil(nb_total / 30) - 1, 10)  # max 10 offsets par ville
-    # 8 directions × 3 distances = 24 offsets possibles
+    extra = min(math.ceil(nb_total / 30) - 1, 20)  # max 20 offsets par ville
+    # 8 directions × 4 distances = 32 offsets possibles
     dirs = [(1,0),(-1,0),(0,1),(0,-1),(0.7,0.7),(-0.7,0.7),(0.7,-0.7),(-0.7,-0.7)]
     result = []
-    for km in [20, 40, 60]:
+    for km in [60, 90, 120, 150]:
         for dlat, dlng in dirs:
             dlat_deg = dlat * km / 111.0
             dlng_deg = dlng * km / (111.0 * cos(radians(base_lat)))
