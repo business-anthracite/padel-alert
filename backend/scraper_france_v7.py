@@ -239,22 +239,31 @@ def main():
         return
 
     # ── Pages suivantes via submit_page ────────────────────────────────────────
-    nb_pages = math.ceil(nb_total / 30)
-    print(f"Pagination : {nb_pages} pages estimées ({nb_total} tournois)")
+    # Boucle non bornée par nb_total (peut être un plafond d'affichage Ten'Up,
+    # ex : 10 000 alors que le vrai stock est plus grand). Arrêt sur résultat vide.
+    nb_pages_est = math.ceil(nb_total / 30) if nb_total else "?"
+    print(f"Pagination : ~{nb_pages_est} pages estimées (nb_total={nb_total})")
 
-    start_page = 1 if items0 else 2  # si fallback p1 déjà fait, commencer à p2
-    for page_num in range(start_page, nb_pages + 3):  # +3 marge de sécurité
+    start_page = 1 if items0 else 2
+    consecutive_empty = 0
+    for page_num in range(start_page, 99999):
         items, _ = ajax_france_page(session, fbid, page_num, date_start, date_end)
         if not items:
-            print(f"  Page {page_num} : vide — arrêt")
-            break
+            consecutive_empty += 1
+            if consecutive_empty >= 2:
+                print(f"  2 pages vides consécutives — arrêt à la page {page_num}")
+                break
+            print(f"  Page {page_num} : vide ({consecutive_empty}/2)")
+            time.sleep(1)
+            continue
+        consecutive_empty = 0
         new_count = 0
         for it in items:
             tid = str(it.get("id", ""))
             if tid and tid not in all_raw:
                 all_raw[tid] = it
                 new_count += 1
-        print(f"  Page {page_num}/{nb_pages} : {len(items)} items, {new_count} nouveaux (total: {len(all_raw)})")
+        print(f"  Page {page_num}/{nb_pages_est} : {len(items)} items, {new_count} nouveaux (total: {len(all_raw)})")
         if new_count == 0:
             print(f"  Aucun nouveau item — arrêt à la page {page_num}")
             break
