@@ -1,17 +1,19 @@
 """
-Padel Alert — Scraper France v6 — fenêtres 1-jour
+Padel Alert — Scraper France v6 — multi-villes 43 communes + nouveaux critères
 
-Découvertes diagnostics 06-07/05/2026 :
-- Ten'Up a redesigné son formulaire : nouveaux critères famille_tournois[], categorie_age[], etc.
-- Anciens critères (P25/P50, type[P], categorie_age[910]) → "Un choix interdit"
-- sort="dateDebut asc" valide (vs "_DATE_" invalide)
-- La pagination est cassée avec les nouveaux critères (pages 1,2,3... = même 30 items)
-- Solution : fenêtres de 1 jour → ~12 tournois/jour, pas besoin de pagination
-- 90 jours × 0.15s = ~15 secondes de scraping
+Architecture : identique au v5 (ville + rayon 100km) mais avec les nouveaux critères
+Ten'Up post-redesign (mai 2026) :
+  - sort="dateDebut asc" ou "_DIST_" (valide)
+  - famille_tournois[], categorie_age[] nouvelle nomenclature
+  - Anciens critères (type[P], categorie_age[910], P25...) → "Un choix interdit"
+  - Pagination ville fonctionne (getConfirmé v13 : Paris 100km → 137 résultats)
+
+43 communes = couverture optimale métropole + Corse, rayon 100km
 """
-import os, json, subprocess, time
+import os, json, math, subprocess, time
 from datetime import datetime, timedelta
 import requests
+from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 OUTPUT_FILE  = "data/tournaments.json"
@@ -19,12 +21,12 @@ TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
 TENUP_AJAX   = f"{TENUP_BASE}/system/ajax"
 HORIZON_DAYS = 90
+RAYON        = "100"
 RETRY_MAX    = 3
 
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
-# Nouveaux critères Ten'Up (redesign entre avril et mai 2026)
-# Remplacent les anciens P25/P50/type[P]/categorie_age[910] qui causaient "Un choix interdit"
+# Nouveaux critères Ten'Up (redesign mai 2026)
 NEW_CRITERIA = {
     "epreuve[DX]": "DX", "epreuve[DM]": "DM", "epreuve[DD]": "DD",
     "categorie_age[70|80|96|97|98|90|95|65|99|100]": "70|80|96|97|98|90|95|65|99|100",
@@ -45,6 +47,66 @@ NEW_CRITERIA = {
     "surface[B_PIL]": "B_PIL", "surface[DUR  ]": "DUR  ",
     "surface[GAZON]": "GAZON", "surface[AUTRE]": "AUTRE",
 }
+
+# 43 communes — couverture complète métropole + Corse, rayon 100km
+VILLES_FRANCE = [
+    # Hauts-de-France
+    {"ville_value": "Montdidier, 80500",          "ville_label": "Montdidier, 80, Somme, Hauts-de-France",                               "lat": "49.6483",  "lng": "2.5711"},
+    {"ville_value": "Bouquemaison, 62270",         "ville_label": "Bouquemaison, 62, Pas-de-Calais, Hauts-de-France",                     "lat": "50.2167",  "lng": "2.3000"},
+    # Grand Est
+    {"ville_value": "Charleville-Mézières, 08000","ville_label": "Charleville-Mézières, 08, Ardennes, Grand Est",                        "lat": "49.7716",  "lng": "4.7158"},
+    {"ville_value": "Bar-le-Duc, 55000",           "ville_label": "Bar-le-Duc, 55, Meuse, Grand Est",                                     "lat": "48.7728",  "lng": "5.1639"},
+    {"ville_value": "Marigny-le-Châtel, 10350",    "ville_label": "Marigny-le-Châtel, 10, Aube, Grand Est",                               "lat": "48.3333",  "lng": "3.8167"},
+    {"ville_value": "Vahl-lès-Bénestroff, 57670",  "ville_label": "Vahl-lès-Bénestroff, 57, Moselle, Grand Est",                          "lat": "48.9167",  "lng": "6.8667"},
+    {"ville_value": "Mulhouse, 68100",             "ville_label": "Mulhouse, 68, Haut-Rhin, Grand Est",                                   "lat": "47.7508",  "lng": "7.3359"},
+    # Normandie
+    {"ville_value": "Flers, 61100",                "ville_label": "Flers, 61, Orne, Normandie",                                           "lat": "48.7469",  "lng": "-0.5738"},
+    {"ville_value": "Saint-Lô, 50000",             "ville_label": "Saint-Lô, 50, Manche, Normandie",                                     "lat": "49.1167",  "lng": "-1.0833"},
+    {"ville_value": "Bernay, 27300",               "ville_label": "Bernay, 27, Eure, Normandie",                                         "lat": "49.0863",  "lng": "0.5993"},
+    # Bretagne
+    {"ville_value": "Châteaulin, 29150",           "ville_label": "Châteaulin, 29, Finistère, Bretagne",                                  "lat": "48.1942",  "lng": "-4.0842"},
+    {"ville_value": "Pontivy, 56300",              "ville_label": "Pontivy, 56, Morbihan, Bretagne",                                      "lat": "48.0714",  "lng": "-2.9736"},
+    # Pays de la Loire
+    {"ville_value": "Ancenis-Saint-Géréon, 44150", "ville_label": "Ancenis-Saint-Géréon, 44, Loire-Atlantique, Pays de la Loire",         "lat": "47.3667",  "lng": "-1.1667"},
+    {"ville_value": "Fontenay-le-Comte, 85200",    "ville_label": "Fontenay-le-Comte, 85, Vendée, Pays de la Loire",                     "lat": "46.4677",  "lng": "-0.8076"},
+    # Centre-Val de Loire
+    {"ville_value": "Orléans, 45000",              "ville_label": "Orléans, 45, Loiret, Centre-Val de Loire",                            "lat": "47.9027",  "lng": "1.9090"},
+    {"ville_value": "Tours, 37000",                "ville_label": "Tours, 37, Indre-et-Loire, Centre-Val de Loire",                      "lat": "47.3941",  "lng": "0.6848"},
+    {"ville_value": "Châteauroux, 36000",          "ville_label": "Châteauroux, 36, Indre, Centre-Val de Loire",                         "lat": "46.8113",  "lng": "1.6924"},
+    # Île-de-France
+    {"ville_value": "Montereau-Fault-Yonne, 77130","ville_label": "Montereau-Fault-Yonne, 77, Seine-et-Marne, Île-de-France",            "lat": "48.3833",  "lng": "2.9500"},
+    # Bourgogne-Franche-Comté
+    {"ville_value": "Besançon, 25000",             "ville_label": "Besançon, 25, Doubs, Bourgogne-Franche-Comté",                        "lat": "47.2378",  "lng": "6.0241"},
+    {"ville_value": "Chalon-sur-Saône, 71100",     "ville_label": "Chalon-sur-Saône, 71, Saône-et-Loire, Bourgogne-Franche-Comté",       "lat": "46.7786",  "lng": "4.8537"},
+    # Nouvelle-Aquitaine
+    {"ville_value": "Ruffec, 16700",               "ville_label": "Ruffec, 16, Charente, Nouvelle-Aquitaine",                            "lat": "46.0333",  "lng": "0.1833"},
+    {"ville_value": "Saintes, 17100",              "ville_label": "Saintes, 17, Charente-Maritime, Nouvelle-Aquitaine",                  "lat": "45.7470",  "lng": "-0.6319"},
+    {"ville_value": "Tulle, 19000",                "ville_label": "Tulle, 19, Corrèze, Nouvelle-Aquitaine",                              "lat": "45.2688",  "lng": "1.7726"},
+    {"ville_value": "Périgueux, 24000",            "ville_label": "Périgueux, 24, Dordogne, Nouvelle-Aquitaine",                         "lat": "45.1854",  "lng": "0.7218"},
+    {"ville_value": "Morcenx-la-Nouvelle, 40110",  "ville_label": "Morcenx-la-Nouvelle, 40, Landes, Nouvelle-Aquitaine",                 "lat": "44.0342",  "lng": "-0.9131"},
+    {"ville_value": "Oloron-Sainte-Marie, 64400",  "ville_label": "Oloron-Sainte-Marie, 64, Pyrénées-Atlantiques, Nouvelle-Aquitaine",   "lat": "43.1942",  "lng": "-0.6058"},
+    # Auvergne-Rhône-Alpes
+    {"ville_value": "Aurouër, 03460",              "ville_label": "Aurouër, 03, Allier, Auvergne-Rhône-Alpes",                           "lat": "46.7167",  "lng": "3.3167"},
+    {"ville_value": "Évaux-les-Bains, 23110",      "ville_label": "Évaux-les-Bains, 23, Creuse, Nouvelle-Aquitaine",                     "lat": "46.1764",  "lng": "2.4792"},
+    {"ville_value": "Brioude, 43100",              "ville_label": "Brioude, 43, Haute-Loire, Auvergne-Rhône-Alpes",                      "lat": "45.2952",  "lng": "3.3830"},
+    {"ville_value": "Saint-Maurice-de-Lignon, 43200","ville_label": "Saint-Maurice-de-Lignon, 43, Haute-Loire, Auvergne-Rhône-Alpes",    "lat": "45.2167",  "lng": "4.0833"},
+    {"ville_value": "Saint-François-de-Sales, 73700","ville_label": "Saint-François-de-Sales, 73, Savoie, Auvergne-Rhône-Alpes",         "lat": "45.6833",  "lng": "6.3167"},
+    {"ville_value": "Montélimar, 26200",           "ville_label": "Montélimar, 26, Drôme, Auvergne-Rhône-Alpes",                        "lat": "44.5567",  "lng": "4.7492"},
+    # Provence-Alpes-Côte d'Azur
+    {"ville_value": "Pertuis, 84120",              "ville_label": "Pertuis, 84, Vaucluse, Provence-Alpes-Côte d'Azur",                   "lat": "43.6942",  "lng": "5.5028"},
+    {"ville_value": "Thorame-Basse, 04170",        "ville_label": "Thorame-Basse, 04, Alpes-de-Haute-Provence, Provence-Alpes-Côte d'Azur","lat": "44.0833","lng": "6.4833"},
+    # Occitanie
+    {"ville_value": "Cahors, 46000",               "ville_label": "Cahors, 46, Lot, Occitanie",                                          "lat": "44.4484",  "lng": "1.4411"},
+    {"ville_value": "Tarbes, 65000",               "ville_label": "Tarbes, 65, Hautes-Pyrénées, Occitanie",                              "lat": "43.2333",  "lng": "0.0783"},
+    {"ville_value": "Albi, 81000",                 "ville_label": "Albi, 81, Tarn, Occitanie",                                           "lat": "43.9267",  "lng": "2.1483"},
+    {"ville_value": "Lodève, 34700",               "ville_label": "Lodève, 34, Hérault, Occitanie",                                      "lat": "43.7319",  "lng": "3.3195"},
+    {"ville_value": "Foix, 09000",                 "ville_label": "Foix, 09, Ariège, Occitanie",                                         "lat": "42.9647",  "lng": "1.6064"},
+    {"ville_value": "Perpignan, 66000",            "ville_label": "Perpignan, 66, Pyrénées-Orientales, Occitanie",                       "lat": "42.6983",  "lng": "2.8954"},
+    # Corse
+    {"ville_value": "Ajaccio, 20000",              "ville_label": "Ajaccio, 20, Corse-du-Sud, Corse",                                    "lat": "41.9197",  "lng": "8.7386"},
+    {"ville_value": "Porto-Vecchio, 20137",        "ville_label": "Porto-Vecchio, 20, Corse-du-Sud, Corse",                              "lat": "41.5928",  "lng": "9.2794"},
+    {"ville_value": "Corte, 20250",                "ville_label": "Corte, 20, Haute-Corse, Corse",                                       "lat": "42.3064",  "lng": "9.1498"},
+]
 
 
 # ── Session ────────────────────────────────────────────────────────────────────
@@ -83,26 +145,29 @@ def make_session(cookies):
     return s
 
 
-# ── AJAX ───────────────────────────────────────────────────────────────────────
+# ── AJAX ville ─────────────────────────────────────────────────────────────────
 
-def ajax_day(session, fbid, date_day):
-    """AJAX pour un jour précis. Retourne (items, nb_total).
-    Stratégie fenêtre 1-jour : contourne la pagination cassée avec les nouveaux critères.
-    Avec ~12 tournois/jour en moyenne, on reste sous le seuil de 30/page.
-    """
+def ajax_ville_page(session, fbid, ville, date_start, date_end, page_num):
+    """AJAX pour une ville, une page. Retourne (items, nb_total)."""
     data = {
-        "recherche_type": "ligue",
-        "cbrappel[]": "57",          # requis pour la session (filtre non appliqué côté serveur)
+        "recherche_type": "ville",
+        "ville[autocomplete][country]": "fr",
+        "ville[autocomplete][textfield]": "",
+        "ville[autocomplete][value_container][value_field]": ville["ville_value"],
+        "ville[autocomplete][value_container][label_field]": ville["ville_label"],
+        "ville[autocomplete][value_container][lat_field]":   ville["lat"],
+        "ville[autocomplete][value_container][lng_field]":   ville["lng"],
+        "ville[distance][value_field]": RAYON,
         "pratique": "PADEL",
-        "date[start]": date_day,
-        "date[end]":   date_day,
-        "sort": "dateDebut asc",
+        "date[start]": date_start,
+        "date[end]":   date_end,
         **NEW_CRITERIA,
+        "sort": "_DIST_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  "submit_main",
         "_triggering_element_value": "Rechercher",
         "form_build_id": fbid,
-        "page": "0",
+        "page": str(page_num),
     }
     for attempt in range(1, RETRY_MAX + 1):
         try:
@@ -114,10 +179,43 @@ def ajax_day(session, fbid, date_day):
                     return res.get("items", []), res.get("nb_results", 0)
             return [], 0
         except Exception as e:
-            print(f"  Erreur jour {date_day} attempt {attempt}: {e}")
+            print(f"    Erreur page {page_num} attempt {attempt}: {e}")
             if attempt < RETRY_MAX:
                 time.sleep(2 * attempt)
     return [], 0
+
+
+def scrape_ville(session, fbid, ville, date_start, date_end):
+    """Scrape tous les tournois d'une ville (avec pagination si elle fonctionne)."""
+    name = ville["ville_value"].split(",")[0]
+    all_items = {}
+
+    items0, nb_total = ajax_ville_page(session, fbid, ville, date_start, date_end, 0)
+    for it in items0:
+        all_items[str(it.get("id", ""))] = it
+
+    if nb_total == 0:
+        return list(all_items.values()), 0
+
+    nb_pages = math.ceil(nb_total / 30)
+    if nb_pages > 1:
+        for page_num in range(1, min(nb_pages, 50)):  # max 50 pages par ville
+            items, _ = ajax_ville_page(session, fbid, ville, date_start, date_end, page_num)
+            if not items:
+                break
+            new_count = 0
+            for it in items:
+                tid = str(it.get("id", ""))
+                if tid and tid not in all_items:
+                    all_items[tid] = it
+                    new_count += 1
+            if new_count == 0:
+                break  # pagination cyclique détectée
+            time.sleep(0.2)
+
+    if nb_total > 0:
+        print(f"  {name} ({RAYON}km) : {nb_total} résultats → {len(all_items)} uniques")
+    return list(all_items.values()), nb_total
 
 
 # ── Parsing ────────────────────────────────────────────────────────────────────
@@ -193,49 +291,48 @@ def parse_item(item):
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
-    now = datetime.now()
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v6 fenêtres 1-jour ({HORIZON_DAYS} jours)")
+    now        = datetime.now()
+    date_start = now.strftime("%d/%m/%y")
+    date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v6 — {len(VILLES_FRANCE)} villes ({date_start}→{date_end})")
 
     fbid, cookies = get_session()
     session = make_session(cookies)
 
-    all_items = {}
-    overflow_days = []  # jours avec 30 items (possiblement tronqués)
+    all_raw = {}  # tenup_id → item brut
+    stats   = {}
 
-    for day_offset in range(HORIZON_DAYS):
-        date_day = (now + timedelta(days=day_offset)).strftime("%d/%m/%y")
-        items, nb = ajax_day(session, fbid, date_day)
-        for it in items:
-            all_items[str(it.get("id", ""))] = it
-        if nb >= 30:
-            overflow_days.append({"date": date_day, "nb": nb})
-        if day_offset % 15 == 0 and day_offset > 0:
+    for i, ville in enumerate(VILLES_FRANCE, 1):
+        items, nb_total = scrape_ville(session, fbid, ville, date_start, date_end)
+        name = ville["ville_value"].split(",")[0]
+        stats[name] = {"nb_total": nb_total, "scraped": len(items)}
+        for item in items:
+            tid = str(item.get("id", ""))
+            if tid and tid not in all_raw:
+                all_raw[tid] = item
+        if i % 10 == 0:
             elapsed = (datetime.now() - now).total_seconds()
-            print(f"  Jour {day_offset}/{HORIZON_DAYS} — {len(all_items)} collectés ({elapsed:.0f}s)")
-        time.sleep(0.15)
+            print(f"  [{i}/{len(VILLES_FRANCE)}] {len(all_raw)} uniques ({elapsed:.0f}s)")
+        time.sleep(0.3)
 
-    if overflow_days:
-        print(f"\nATTENTION : {len(overflow_days)} jours avec 30+ résultats (pagination non tentée) :")
-        for d in overflow_days:
-            print(f"  {d['date']} : nb={d['nb']}")
-
-    tournaments = [t for item in all_items.values() if (t := parse_item(item))]
-    elapsed_total = (datetime.now() - now).total_seconds()
+    tournaments = [t for item in all_raw.values() if (t := parse_item(item))]
 
     print(f"\n{'='*60}")
-    print(f"Total : {len(tournaments)} tournois uniques en {elapsed_total:.0f}s")
-    print(f"({HORIZON_DAYS} fenêtres 1-jour, {len(overflow_days)} jours avec overflow potentiel)")
+    print(f"Total France : {len(tournaments)} tournois uniques")
+    print("\nDétail par ville (top 10 par nb résultats) :")
+    for name, s in sorted(stats.items(), key=lambda x: -x[1]["nb_total"])[:10]:
+        print(f"  {name}: {s['nb_total']} Ten'Up → {s['scraped']} scrapés")
 
     # Écrire JSON
     os.makedirs("data", exist_ok=True)
     payload = {
-        "scraped_at":  datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "count":       len(tournaments),
-        "tournaments": tournaments,
+        "scraped_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "count":      len(tournaments),
+        "tournaments":tournaments,
     }
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"Fichier écrit : {OUTPUT_FILE}")
+    print(f"\nFichier écrit : {OUTPUT_FILE}")
 
     # Git
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
