@@ -1,0 +1,35 @@
+name: "Padel Alert — Diagnostic DOM pagination (Piste 4)"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: |
+          pip install -r backend/requirements_france.txt
+          playwright install chromium --with-deps
+
+      - name: Lancer diagnostic DOM pagination
+        run: python backend/diag_tenup_dom.py
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: "*.png"
+          if-no-files-found: ignore
