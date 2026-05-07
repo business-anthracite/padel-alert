@@ -1,30 +1,31 @@
 """
-Diagnostic Piste 4 — Test pagination via fetch() dans le contexte browser Playwright
+Diagnostic — Hypothèse fbid chaîné
 
-Question centrale : quand on envoie page=0 puis page=1 depuis le VRAI navigateur
-(avec ses vrais cookies, headers, contexte JS), les items sont-ils différents ?
-Notre requests.Session retourne les mêmes 30 items sur page=1 — est-ce un problème
-de cookies manquants, ou la pagination est vraiment cassée côté serveur ?
+Observation : la pagination fonctionne sur le vrai site (12 pages vues par l'utilisateur).
+Notre page=1 retourne les mêmes 30 items que page=0.
 
-Méthode : page.evaluate(async ...) = fetch() depuis le browser Playwright,
-pas via requests.Session externe. Si les résultats diffèrent → réécrire v7 avec
-cette approche. Si identiques → pagination vraiment cassée, même niveau serveur.
+Hypothèse : Drupal renouvelle le form_build_id dans sa réponse AJAX.
+Le vrai clic "page suivante" utilise ce nouveau fbid — pas l'original.
+Nous envoyons toujours l'ancien fbid → serveur retourne la même page.
+
+Ce diagnostic :
+1. Requête page=0 → log TOUS les commands AJAX retournés
+2. Cherche un nouveau form_build_id dans la réponse (settings, HTML, data...)
+3. Utilise ce fbid renouvelé pour page=1
+4. Compare les IDs page=0 vs page=1
 """
 import json
-import time
 from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright
 
 TENUP_SEARCH = "https://tenup.fft.fr/recherche/tournois"
-TENUP_AJAX   = "https://tenup.fft.fr/system/ajax"
 HORIZON_DAYS = 90
 
-# Ville test : Montereau (~111 résultats, idéale pour tester la pagination)
 VILLE_TEST = {
-    "value":  "Montereau-Fault-Yonne, 77130",
-    "label":  "Montereau-Fault-Yonne, 77, Seine-et-Marne, Île-de-France",
-    "lat":    "48.3833",
-    "lng":    "2.9500",
+    "value": "Paris, 75001",
+    "label": "Paris, 75, Paris, Île-de-France",
+    "lat":   "48.859489",
+    "lng":   "2.347880",
 }
 
 NEW_CRITERIA = {
@@ -49,13 +50,8 @@ NEW_CRITERIA = {
 }
 
 
-def ajax_via_browser(page, fbid, page_num, date_start, date_end):
-    """
-    Envoie une requête AJAX Ten'Up depuis le contexte browser Playwright (fetch interne).
-    Utilise les vrais cookies/headers du browser, pas requests.Session externe.
-    Retourne (items, nb_total) ou ([], 0) en cas d'erreur.
-    """
-    post_data = {
+def make_post_data(fbid, page_num, date_start, date_end):
+    return {
         "recherche_type": "ville",
         "ville[autocomplete][country]": "fr",
         "ville[autocomplete][textfield]": "",
@@ -76,11 +72,19 @@ def ajax_via_browser(page, fbid, page_num, date_start, date_end):
         "page": str(page_num),
     }
 
-    # Utiliser fetch() depuis le browser Playwright (vrais cookies, same-origin)
-    result = page.evaluate("""async (params) => {
+
+def ajax_full(page, fbid, page_num, date_start, date_end):
+    """
+    Requête AJAX depuis le browser Playwright.
+    Retourne TOUS les commands + items extraits + nouveau fbid si trouvé.
+    """
+    post_data = make_post_data(fbid, page_num, date_start, date_end)
+
+    return page.evaluate("""async (params) => {
+        const body = new URLSearchParams(params).toString();
+        let response;
         try {
-            const body = new URLSearchParams(params).toString();
-            const response = await fetch('/system/ajax', {
+            response = await fetch('/system/ajax', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -91,37 +95,89 @@ def ajax_via_browser(page, fbid, page_num, date_start, date_end):
                 },
                 body: body,
             });
-            const data = await response.json();
-            for (const cmd of data) {
-                if (cmd && cmd.command === 'recherche_tournois_update') {
-                    const items = cmd.results?.items || [];
-                    return {
-                        ok: true,
-                        status: response.status,
-                        nb_total: cmd.results?.nb_results || 0,
-                        count: items.length,
-                        ids: items.map(it => String(it.id || '')),
-                        first_item: items[0] ? {id: items[0].id, libelle: items[0].libelle} : null,
-                    };
+        } catch(e) { return {error: String(e)}; }
+
+        let rawData;
+        try { rawData = await response.json(); }
+        catch(e) { return {error: 'JSON parse error: ' + String(e), status: response.status}; }
+
+        const result = {
+            http_status: response.status,
+            commands: [],
+            items: [],
+            nb_total: 0,
+            new_fbid: null,
+            new_fbid_source: null,
+        };
+
+        // Regex pour trouver form_build_id dans du HTML
+        const fbidRegex = /name=[\'""]form_build_id[\'""]\s+value=[\'""]([^\'"">]+)[\'""]|value=[\'""]([^\'"">]+)[\'""][^>]*name=[\'""]form_build_id[\'"\"]/;
+
+        for (const cmd of rawData) {
+            if (!cmd || typeof cmd !== 'object') continue;
+
+            const cmdName = cmd.command || '(no command)';
+            const cmdKeys = Object.keys(cmd).filter(k => k !== 'command');
+            result.commands.push({name: cmdName, keys: cmdKeys});
+
+            // Extraction items + nb_total
+            if (cmdName === 'recherche_tournois_update') {
+                result.items = (cmd.results?.items || []).map(i => String(i.id || ''));
+                result.nb_total = cmd.results?.nb_results || 0;
+            }
+
+            // Chercher nouveau fbid dans settings Drupal
+            if (cmdName === 'settings' && cmd.settings) {
+                const s = JSON.stringify(cmd.settings);
+                const m = s.match(/"form_build_id":"([^"]+)"/);
+                if (m) { result.new_fbid = m[1]; result.new_fbid_source = 'settings'; }
+                // Parfois dans ajaxPageState
+                if (cmd.settings.ajaxPageState) {
+                    result.ajax_page_state = JSON.stringify(cmd.settings.ajaxPageState).substring(0, 200);
                 }
             }
-            return {ok: false, status: response.status, commands: data.map(c => c?.command)};
-        } catch (e) {
-            return {ok: false, error: String(e)};
-        }
-    }""", post_data)
 
-    return result
+            // Chercher dans le HTML injecté (insert, replace, html, prepend, append)
+            if (['insert', 'replace', 'html', 'prepend', 'append', 'changed'].includes(cmdName)) {
+                const html = typeof cmd.data === 'string' ? cmd.data :
+                             typeof cmd.html === 'string' ? cmd.html : '';
+                if (html && html.includes('form_build_id')) {
+                    const m = html.match(fbidRegex);
+                    if (m && !result.new_fbid) {
+                        result.new_fbid = m[1] || m[2];
+                        result.new_fbid_source = `${cmdName}:${cmd.selector || ''}`;
+                    }
+                }
+                // Log le selector pour comprendre ce qui est mis à jour
+                if (cmd.selector) result.commands[result.commands.length-1].selector = cmd.selector;
+            }
+
+            // Chercher dans n'importe quel champ string de la commande
+            if (!result.new_fbid) {
+                for (const [k, v] of Object.entries(cmd)) {
+                    if (typeof v === 'string' && v.includes('form_build_id')) {
+                        const m = v.match(fbidRegex);
+                        if (m) {
+                            result.new_fbid = m[1] || m[2];
+                            result.new_fbid_source = `field:${k}`;
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }""", post_data)
 
 
 def main():
-    print("=" * 60)
-    print("Diagnostic Piste 4 — fetch() browser Playwright")
-    print("=" * 60)
-
     date_start = datetime.now().strftime("%d/%m/%y")
     date_end   = (datetime.now() + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
+
+    print("=" * 60)
+    print("Diagnostic — Hypothèse fbid chaîné (Ten'Up)")
     print(f"Ville: {VILLE_TEST['value']}, période: {date_start} → {date_end}")
+    print("=" * 60)
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -129,119 +185,102 @@ def main():
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             locale="fr-FR",
         )
-        page = ctx.new_page()
+        page_pw = ctx.new_page()
 
-        # ── 1. Charger Ten'Up ──────────────────────────────────────────────────
         print("\n1. Chargement Ten'Up...")
-        page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(8000)
+        page_pw.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
+        page_pw.wait_for_timeout(8000)
 
-        fbid = page.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value || ''")
-        print(f"   form_build_id: {fbid[:40]}..." if fbid else "   ERREUR: form_build_id introuvable")
+        fbid0 = page_pw.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value || ''")
+        print(f"   fbid initial : {fbid0[:50]}...")
 
-        if not fbid:
-            print("Abandon — pas de form_build_id")
-            browser.close()
-            return
+        # ── Page 0 ────────────────────────────────────────────────────────────
+        print("\n2. Requête page=0 (fbid initial)...")
+        r0 = ajax_full(page_pw, fbid0, 0, date_start, date_end)
+        print(f"   HTTP: {r0.get('http_status')}, items: {len(r0.get('items',[]))}, nb_total: {r0.get('nb_total')}")
+        print(f"   Commandes retournées:")
+        for c in r0.get("commands", []):
+            print(f"     [{c['name']}] keys={c['keys']} {c.get('selector','')}")
+        print(f"   Nouveau fbid trouvé: {r0.get('new_fbid', 'NON')}")
+        if r0.get("new_fbid"):
+            print(f"   Source: {r0.get('new_fbid_source')}")
+        if r0.get("ajax_page_state"):
+            print(f"   ajaxPageState: {r0['ajax_page_state']}")
+        ids_p0 = r0.get("items", [])
+        print(f"   IDs page 0: {ids_p0[:5]}")
 
-        # ── 2. Page 0 via fetch() browser ──────────────────────────────────────
-        print("\n2. Requête AJAX page 0 (via fetch browser)...")
-        r0 = ajax_via_browser(page, fbid, 0, date_start, date_end)
-        print(f"   Résultat: {r0}")
-        page.wait_for_timeout(2000)
+        # ── Page 1 avec fbid initial (notre approche actuelle) ────────────────
+        print("\n3. Requête page=1 (fbid INITIAL — approche actuelle)...")
+        page_pw.wait_for_timeout(1000)
+        r1_old = ajax_full(page_pw, fbid0, 1, date_start, date_end)
+        print(f"   HTTP: {r1_old.get('http_status')}, items: {len(r1_old.get('items',[]))}, nb_total: {r1_old.get('nb_total')}")
+        ids_p1_old = r1_old.get("items", [])
+        print(f"   IDs page 1 (fbid initial): {ids_p1_old[:5]}")
+        overlap_old = len(set(ids_p0) & set(ids_p1_old))
+        print(f"   Chevauchement avec page 0: {overlap_old}/{len(ids_p0)}")
 
-        if not r0.get("ok"):
-            print(f"\nErreur page 0 — arrêt. Détails: {r0}")
-            page.screenshot(path="diag_error.png")
-            browser.close()
-            return
+        # ── Page 1 avec nouveau fbid (hypothèse) ─────────────────────────────
+        new_fbid = r0.get("new_fbid")
+        if new_fbid and new_fbid != fbid0:
+            print(f"\n4. Requête page=1 (NOUVEAU fbid de la réponse page=0)...")
+            page_pw.wait_for_timeout(1000)
+            r1_new = ajax_full(page_pw, new_fbid, 1, date_start, date_end)
+            print(f"   HTTP: {r1_new.get('http_status')}, items: {len(r1_new.get('items',[]))}, nb_total: {r1_new.get('nb_total')}")
+            ids_p1_new = r1_new.get("items", [])
+            print(f"   IDs page 1 (nouveau fbid): {ids_p1_new[:5]}")
+            overlap_new = len(set(ids_p0) & set(ids_p1_new))
+            print(f"   Chevauchement avec page 0: {overlap_new}/{len(ids_p0)}")
+            fbid1 = r1_new.get("new_fbid")
+        else:
+            print(f"\n4. Pas de nouveau fbid dans la réponse page=0 — hypothèse non vérifiable")
+            print(f"   Essai avec fbid DOM rechargé...")
+            # Recharger la page et prendre un fbid frais
+            page_pw.reload(wait_until="domcontentloaded", timeout=30000)
+            page_pw.wait_for_timeout(5000)
+            fbid_fresh = page_pw.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value || ''")
 
-        ids_p0    = set(r0["ids"])
-        nb_total  = r0["nb_total"]
-        print(f"   Page 0 : {r0['count']} items, nb_total={nb_total}")
-        print(f"   Premiers IDs: {r0['ids'][:5]}")
-        print(f"   Premier item: {r0.get('first_item')}")
+            # Faire page=0 pour "initialiser" le contexte de session
+            print(f"   Page=0 avec fbid frais pour initialiser...")
+            r0_init = ajax_full(page_pw, fbid_fresh, 0, date_start, date_end)
+            fbid_after_p0 = r0_init.get("new_fbid") or fbid_fresh
+            print(f"   Résultat init: items={len(r0_init.get('items',[]))}, new_fbid={r0_init.get('new_fbid','aucun')}")
 
-        # ── 3. Page 1 via fetch() browser ──────────────────────────────────────
-        print("\n3. Requête AJAX page 1 (même fbid, page=1)...")
-        r1 = ajax_via_browser(page, fbid, 1, date_start, date_end)
-        print(f"   Résultat: {r1}")
-        page.wait_for_timeout(2000)
+            print(f"   Page=1 avec fbid post-p0...")
+            r1_new = ajax_full(page_pw, fbid_after_p0, 1, date_start, date_end)
+            ids_p1_new = r1_new.get("items", [])
+            overlap_new = len(set(r0_init.get("items",[])) & set(ids_p1_new))
+            print(f"   items={len(ids_p1_new)}, overlap={overlap_new}")
+            print(f"   IDs: {ids_p1_new[:5]}")
+            fbid1 = r1_new.get("new_fbid")
 
-        ids_p1 = set(r1.get("ids", [])) if r1.get("ok") else set()
-
-        # ── 4. Page 2 si on en a besoin ────────────────────────────────────────
-        r2 = None
-        if r1.get("ok") and nb_total > 60:
-            print("\n4. Requête AJAX page 2...")
-            r2 = ajax_via_browser(page, fbid, 2, date_start, date_end)
-            print(f"   Résultat: {r2}")
-            page.wait_for_timeout(2000)
-
-        # ── 5. Refresh fbid et tester avec un nouveau fbid ─────────────────────
-        print("\n5. Refresh form_build_id et re-test page 1...")
-        page.reload(wait_until="domcontentloaded", timeout=30000)
-        page.wait_for_timeout(5000)
-        fbid2 = page.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value || ''")
-        print(f"   Nouveau fbid: {fbid2[:40]}...")
-
-        r1_fresh = None
-        if fbid2 and fbid2 != fbid:
-            print("   Test page 0 avec fbid frais...")
-            r0_fresh = ajax_via_browser(page, fbid2, 0, date_start, date_end)
-            print(f"   Page 0 (fbid frais): {r0_fresh}")
-            page.wait_for_timeout(2000)
-            print("   Test page 1 avec fbid frais...")
-            r1_fresh = ajax_via_browser(page, fbid2, 1, date_start, date_end)
-            print(f"   Page 1 (fbid frais): {r1_fresh}")
+        # ── Page 2 pour confirmer la chaîne ───────────────────────────────────
+        if fbid1 and fbid1 != new_fbid:
+            print(f"\n5. Page=2 avec fbid chaîné (depuis réponse page=1)...")
+            page_pw.wait_for_timeout(1000)
+            r2 = ajax_full(page_pw, fbid1, 2, date_start, date_end)
+            print(f"   HTTP: {r2.get('http_status')}, items: {len(r2.get('items',[]))}, nb_total: {r2.get('nb_total')}")
+            print(f"   IDs page 2: {r2.get('items', [])[:5]}")
+        else:
+            print(f"\n5. Pas de fbid chaîné en page=1 — impossible de tester page=2")
 
         browser.close()
 
     # ── Analyse finale ─────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
-    print("ANALYSE FINALE")
+    print("CONCLUSION")
     print("=" * 60)
-
-    print(f"\nPage 0 : {len(ids_p0)} items (nb_total={nb_total})")
-
-    if r1.get("ok"):
-        ids_p1 = set(r1["ids"])
-        overlap   = len(ids_p0 & ids_p1)
-        new_in_p1 = len(ids_p1 - ids_p0)
-        print(f"Page 1 : {len(ids_p1)} items")
-        print(f"  Chevauchement avec page 0 : {overlap}/{len(ids_p0)}")
-        print(f"  Nouveaux items en page 1   : {new_in_p1}")
-        print(f"  Premiers IDs page 1: {r1['ids'][:5]}")
-
-        if ids_p0 == ids_p1:
-            print("\n→ RÉSULTAT : PAGINATION CASSÉE (page 1 == page 0, même depuis browser)")
-            print("  Le problème est côté serveur Ten'Up, pas dans notre requests.Session.")
-            print("  Piste 4 (DOM) ne résout pas le problème fondamental.")
-        elif new_in_p1 > 0:
-            print(f"\n→ RÉSULTAT : PAGINATION FONCTIONNE DEPUIS LE BROWSER !")
-            print(f"  {new_in_p1} items nouveaux en page 1 → requests.Session manquait quelque chose.")
-            print("  Solution : utiliser page.evaluate(fetch) dans le scraper v7 pour paginer.")
+    if new_fbid and new_fbid != fbid0:
+        print(f"Nouveau fbid trouvé dans réponse page=0 (source: {r0.get('new_fbid_source')})")
+        if overlap_new < len(ids_p0):
+            print(f"→ HYPOTHÈSE CONFIRMÉE : page=1 avec fbid renouvelé = {len(ids_p0)-overlap_new} items nouveaux !")
+            print("  Solution : chaîner les fbid entre les requêtes de pagination.")
         else:
-            print("\n→ RÉSULTAT AMBIGU")
+            print(f"→ Fbid renouvelé trouvé MAIS page=1 reste identique ({overlap_new}/{len(ids_p0)} overlap)")
+            print("  Le fbid chaîné seul ne suffit pas.")
     else:
-        print(f"Page 1 : ÉCHEC — {r1}")
-
-    if r2 and r2.get("ok"):
-        ids_p2 = set(r2["ids"])
-        overlap_p2 = len(ids_p0 & ids_p2)
-        print(f"\nPage 2 : {len(ids_p2)} items, overlap avec p0={overlap_p2}")
-
-    if r1_fresh:
-        if r1_fresh.get("ok"):
-            ids_p1f = set(r1_fresh["ids"])
-            overlap_f = len(ids_p0 & ids_p1f)
-            print(f"\nPage 1 (fbid frais) : {len(ids_p1f)} items, overlap avec p0={overlap_f}")
-            if ids_p0 == ids_p1f:
-                print("  → Même résultat avec fbid frais : pagination vraiment cassée")
-            elif len(ids_p1f - ids_p0) > 0:
-                print(f"  → {len(ids_p1f - ids_p0)} items nouveaux avec fbid frais !")
-        else:
-            print(f"\nPage 1 (fbid frais) : ÉCHEC — {r1_fresh}")
+        print("Aucun nouveau fbid dans la réponse — la réponse AJAX ne renouvelle pas le fbid.")
+        print("Hypothèse fbid-chaîné non confirmée.")
+        print("→ Chercher une autre explication à la pagination côté navigateur.")
 
 
 if __name__ == "__main__":
