@@ -114,7 +114,7 @@ def ajax_france_page(session, fbid, page_num, date_start, date_end):
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        "sort": "_DIST_",
+        "sort": "dateDebut asc",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  trigger_name,
         "_triggering_element_value": trigger_value,
