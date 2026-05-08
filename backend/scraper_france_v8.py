@@ -13,7 +13,7 @@ Flow par ligue :
 
 18 ligues × ~300-600 tournois chacune ≈ 10 000 tournois uniques.
 """
-import os, json, math, subprocess, time
+import os, json, math, subprocess, time, re
 from datetime import datetime, timedelta
 import requests
 from playwright.sync_api import sync_playwright
@@ -71,6 +71,18 @@ def get_session():
         raise RuntimeError("form_build_id introuvable")
     print(f"Session OK — fbid: {fbid[:35]}...")
     return fbid, cookies
+
+
+def refresh_fbid(session):
+    """GET la page de recherche pour obtenir un nouveau form_build_id."""
+    try:
+        resp = session.get(TENUP_SEARCH, timeout=30)
+        m = re.search(r'name="form_build_id"\s+value="([^"]+)"', resp.text)
+        if not m:
+            m = re.search(r'value="([^"]+)"\s+name="form_build_id"', resp.text)
+        return m.group(1) if m else None
+    except Exception:
+        return None
 
 
 def make_session(cookies):
@@ -222,18 +234,25 @@ def scrape_ligue(session, fbid, ligue, date_start, date_end):
         return [], 0
 
     # 3. Deux passes pour maximiser la couverture :
-    #    - dateDebut asc  : couvre les tournois proches en date chronologique
-    #    - dateDebut desc : couvre depuis la fin → différents groupes de date
+    #    - dateDebut asc  : couvre du début vers la fin chronologique
+    #    - dateDebut desc : couvre depuis la fin → groupes de dates différents
+    #    Chaque passe utilise un fbid frais pour que submit_main fonctionne correctement.
     nb_total = 0  # initialisé ici pour éviter UnboundLocalError
     sample_logged = False
+    current_fbid = fbid
 
     for sort_order in ["dateDebut asc", "dateDebut desc"]:
-        items0, nb_total_pass = ajax_ligue_page(session, fbid, 0, date_start, date_end,
+        # Rafraîchir le fbid avant chaque passe (le précédent est "consommé")
+        new_fbid = refresh_fbid(session)
+        if new_fbid:
+            current_fbid = new_fbid
+
+        items0, nb_total_pass = ajax_ligue_page(session, current_fbid, 0, date_start, date_end,
                                                 sort_order=sort_order)
 
         fallback_used = False
         if not items0 and nb_total_pass == 0:
-            items0, nb_total_pass = ajax_ligue_page(session, fbid, 1, date_start, date_end,
+            items0, nb_total_pass = ajax_ligue_page(session, current_fbid, 1, date_start, date_end,
                                                     sort_order=sort_order)
             fallback_used = True
 
@@ -261,7 +280,7 @@ def scrape_ligue(session, fbid, ligue, date_start, date_end):
         consecutive_empty = 0
 
         for page_num in range(start_page, 99999):
-            items, _ = ajax_ligue_page(session, fbid, page_num, date_start, date_end,
+            items, _ = ajax_ligue_page(session, current_fbid, page_num, date_start, date_end,
                                        sort_order=sort_order)
             if not items:
                 consecutive_empty += 1
@@ -322,38 +341,33 @@ def parse_item(item):
     else:
         date_str = "Date inconnue"
 
+    # Structure API Ten'Up (redesign 2026) — confirmée par debug 08/05/2026 :
+    # natureEpreuve.code = DM/DD/DX  → type d'épreuve (sexe)
+    # typeEpreuve.code   = P25/P50/P100...  → niveau
+    # categorieAge.libelle = "Senior", "55 ans"...  → catégorie d'âge
     epreuves_raw = item.get("epreuves", [])
     match_types, age_codes, niveau_codes, competition_codes = set(), set(), set(), set()
-    NIVEAU_PREFIXES = ("P", "NC", "NR")  # P25, P50, P100..., NC, NR
-    MATCH_CODES     = {"DM", "DD", "DX", "SM", "SD", "SX"}
 
     for e in epreuves_raw:
-        # typeEpreuve → DM/DD/DX (type d'épreuve / sexe)
-        t = (e.get("typeEpreuve") or {}).get("code", "")
-        if t:
-            if t in MATCH_CODES:
-                match_types.add(t)
-            elif t and t[0] in "P" or any(t.startswith(p) for p in NIVEAU_PREFIXES):
-                niveau_codes.add(t)   # parfois le niveau est dans typeEpreuve
-            else:
-                match_types.add(t)
+        # natureEpreuve → DM/DD/DX (type d'épreuve)
+        nat = (e.get("natureEpreuve") or {}).get("code", "")
+        if nat:
+            match_types.add(nat)
 
-        # categorieEpreuve → P25/P50/P100... (niveau)
-        n = (e.get("categorieEpreuve") or {}).get("code", "")
-        if n:
-            niveau_codes.add(n)
+        # typeEpreuve → P25/P50/P100... (niveau)
+        niv = (e.get("typeEpreuve") or {}).get("code", "")
+        if niv:
+            niveau_codes.add(niv)
 
-        # categoriePratiquant → codes âge (Senior, U18...)
-        a = (e.get("categoriePratiquant") or {}).get("code", "")
-        if not a:
-            a = (e.get("categoriePratiquant") or {}).get("libelle", "")
-        if a:
-            age_codes.add(a)
+        # categorieAge → Senior / 55 ans / 45 ans... (catégorie d'âge)
+        age_lib = (e.get("categorieAge") or {}).get("libelle", "")
+        if age_lib:
+            age_codes.add(age_lib)
 
-        # typeCompetition → T/C/etc.
-        c = (e.get("typeCompetition") or {}).get("code", "")
-        if c:
-            competition_codes.add(c)
+        # typeCompetition (si présent)
+        comp = (e.get("typeCompetition") or {}).get("code", "")
+        if comp:
+            competition_codes.add(comp)
 
     match_types       = sorted(match_types)
     age_codes         = sorted(age_codes)
