@@ -224,7 +224,9 @@ def scrape_ligue(session, fbid, ligue, date_start, date_end):
     # 3. Deux passes pour maximiser la couverture :
     #    - dateDebut asc  : couvre les tournois proches en date chronologique
     #    - dateDebut desc : couvre depuis la fin → différents groupes de date
-    #    L'union des deux donne ~80-90% vs ~50% en une seule passe.
+    nb_total = 0  # initialisé ici pour éviter UnboundLocalError
+    sample_logged = False
+
     for sort_order in ["dateDebut asc", "dateDebut desc"]:
         items0, nb_total_pass = ajax_ligue_page(session, fbid, 0, date_start, date_end,
                                                 sort_order=sort_order)
@@ -235,11 +237,22 @@ def scrape_ligue(session, fbid, ligue, date_start, date_end):
                                                     sort_order=sort_order)
             fallback_used = True
 
-        if nb_total == 0:
+        if nb_total == 0 and nb_total_pass > 0:
             nb_total = nb_total_pass
 
+        # Log structure epreuves sur le premier item trouvé (pour debug colonnes WP)
+        if not sample_logged and items0:
+            sample_logged = True
+            sample = items0[0]
+            epreuves = sample.get("epreuves", [])
+            if epreuves:
+                print(f"    [DEBUG epreuves[0]] {json.dumps(epreuves[0])[:300]}")
+
         for it in items0:
-            all_items[str(it.get("id", ""))] = it
+            tid = str(it.get("id", ""))
+            if tid:
+                it["_ligue"] = ligue_name  # injection contexte ligue
+                all_items[tid] = it
 
         if nb_total_pass == 0:
             continue
@@ -261,6 +274,7 @@ def scrape_ligue(session, fbid, ligue, date_start, date_end):
             for it in items:
                 tid = str(it.get("id", ""))
                 if tid and tid not in all_items:
+                    it["_ligue"] = ligue_name
                     all_items[tid] = it
                     new_count += 1
             if new_count == 0:
@@ -308,11 +322,43 @@ def parse_item(item):
     else:
         date_str = "Date inconnue"
 
-    epreuves_raw      = item.get("epreuves", [])
-    match_types       = list({e.get("typeEpreuve",        {}).get("code", "") for e in epreuves_raw if e.get("typeEpreuve",        {}).get("code")})
-    age_codes         = list({e.get("categoriePratiquant",{}).get("code", "") for e in epreuves_raw if e.get("categoriePratiquant",{}).get("code")})
-    niveau_codes      = list({e.get("categorieEpreuve",   {}).get("code", "") for e in epreuves_raw if e.get("categorieEpreuve",   {}).get("code")})
-    competition_codes = list({e.get("typeCompetition",    {}).get("code", "") for e in epreuves_raw if e.get("typeCompetition",    {}).get("code")})
+    epreuves_raw = item.get("epreuves", [])
+    match_types, age_codes, niveau_codes, competition_codes = set(), set(), set(), set()
+    NIVEAU_PREFIXES = ("P", "NC", "NR")  # P25, P50, P100..., NC, NR
+    MATCH_CODES     = {"DM", "DD", "DX", "SM", "SD", "SX"}
+
+    for e in epreuves_raw:
+        # typeEpreuve → DM/DD/DX (type d'épreuve / sexe)
+        t = (e.get("typeEpreuve") or {}).get("code", "")
+        if t:
+            if t in MATCH_CODES:
+                match_types.add(t)
+            elif t and t[0] in "P" or any(t.startswith(p) for p in NIVEAU_PREFIXES):
+                niveau_codes.add(t)   # parfois le niveau est dans typeEpreuve
+            else:
+                match_types.add(t)
+
+        # categorieEpreuve → P25/P50/P100... (niveau)
+        n = (e.get("categorieEpreuve") or {}).get("code", "")
+        if n:
+            niveau_codes.add(n)
+
+        # categoriePratiquant → codes âge (Senior, U18...)
+        a = (e.get("categoriePratiquant") or {}).get("code", "")
+        if not a:
+            a = (e.get("categoriePratiquant") or {}).get("libelle", "")
+        if a:
+            age_codes.add(a)
+
+        # typeCompetition → T/C/etc.
+        c = (e.get("typeCompetition") or {}).get("code", "")
+        if c:
+            competition_codes.add(c)
+
+    match_types       = sorted(match_types)
+    age_codes         = sorted(age_codes)
+    niveau_codes      = sorted(niveau_codes)
+    competition_codes = sorted(competition_codes)
 
     try:
         lat_f = float(lat) if lat not in (None, "", "0", 0, 0.0) else None
@@ -336,7 +382,7 @@ def parse_item(item):
         "age_codes":        age_codes,
         "niveau_codes":     niveau_codes,
         "competition_codes":competition_codes,
-        "ligues":           [],
+        "ligues":           [item["_ligue"]] if item.get("_ligue") else [],
         "link":             f"{TENUP_BASE}/tournoi/{tid}",
     }
 
