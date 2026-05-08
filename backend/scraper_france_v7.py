@@ -97,16 +97,16 @@ def ajax_france_page(session, fbid, page_num, date_start, date_end):
         trigger_name  = "submit_page"
         trigger_value = "Submit page"
 
-    # Pas de critères (epreuve/age/type/famille) : le serveur retourne TOUS les
-    # tournois padel. Envoyer des critères spécifiques filtre et réduit les résultats.
+    # Coordonnées de Paris comme référence pour sort=_DIST_ (stabilise l'ordre).
+    # Sans coordonnées, sort=_DIST_ est instable → même items sur pages différentes.
     data = {
         "recherche_type": "ligue",
         "ville[autocomplete][country]": "fr",
         "ville[autocomplete][textfield]": "",
         "ville[autocomplete][value_container][value_field]": "",
         "ville[autocomplete][value_container][label_field]": "",
-        "ville[autocomplete][value_container][lat_field]": "",
-        "ville[autocomplete][value_container][lng_field]": "",
+        "ville[autocomplete][value_container][lat_field]": "48.859489",
+        "ville[autocomplete][value_container][lng_field]": "2.347880",
         "ville[distance][value_field]": "0",
         "club[autocomplete][textfield]": "",
         "club[autocomplete][value_container][value_field]": "",
@@ -114,7 +114,7 @@ def ajax_france_page(session, fbid, page_num, date_start, date_end):
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        "sort": "dateDebut asc",
+        "sort": "_DIST_",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  trigger_name,
         "_triggering_element_value": trigger_value,
