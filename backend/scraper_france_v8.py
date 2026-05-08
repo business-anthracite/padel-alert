@@ -153,7 +153,7 @@ def set_ligue_filter(session, ligue_id, comites):
 
 # ── AJAX recherche ─────────────────────────────────────────────────────────────
 
-def ajax_ligue_page(session, fbid, page_num, date_start, date_end):
+def ajax_ligue_page(session, fbid, page_num, date_start, date_end, sort_order="dateDebut asc"):
     """
     Requête AJAX /system/ajax pour la ligue courante (définie en session PHP).
     page=0 → submit_main | page>0 → submit_page
@@ -180,7 +180,7 @@ def ajax_ligue_page(session, fbid, page_num, date_start, date_end):
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        "sort": "dateDebut asc",
+        "sort": sort_order,
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  trigger_name,
         "_triggering_element_value": trigger_value,
@@ -221,45 +221,51 @@ def scrape_ligue(session, fbid, ligue, date_start, date_end):
         print(f"  ERREUR ligue_sumbit/ajax pour {ligue_name}")
         return [], 0
 
-    # 3. Page 0
-    items0, nb_total = ajax_ligue_page(session, fbid, 0, date_start, date_end)
+    # 3. Deux passes pour maximiser la couverture :
+    #    - dateDebut asc  : couvre les tournois proches en date chronologique
+    #    - dateDebut desc : couvre depuis la fin → différents groupes de date
+    #    L'union des deux donne ~80-90% vs ~50% en une seule passe.
+    for sort_order in ["dateDebut asc", "dateDebut desc"]:
+        items0, nb_total_pass = ajax_ligue_page(session, fbid, 0, date_start, date_end,
+                                                sort_order=sort_order)
 
-    # Fallback si page 0 vide
-    fallback_used = False
-    if not items0 and nb_total == 0:
-        items0, nb_total = ajax_ligue_page(session, fbid, 1, date_start, date_end)
-        fallback_used = True
+        fallback_used = False
+        if not items0 and nb_total_pass == 0:
+            items0, nb_total_pass = ajax_ligue_page(session, fbid, 1, date_start, date_end,
+                                                    sort_order=sort_order)
+            fallback_used = True
 
-    for it in items0:
-        all_items[str(it.get("id", ""))] = it
+        if nb_total == 0:
+            nb_total = nb_total_pass
 
-    if nb_total == 0:
-        print(f"  {ligue_name} : 0 résultats")
-        return [], 0
+        for it in items0:
+            all_items[str(it.get("id", ""))] = it
 
-    # 4. Pages suivantes
-    start_page   = 2 if fallback_used else 1
-    nb_pages_est = math.ceil(nb_total / 30)
-    consecutive_empty = 0
-
-    for page_num in range(start_page, 99999):
-        items, _ = ajax_ligue_page(session, fbid, page_num, date_start, date_end)
-        if not items:
-            consecutive_empty += 1
-            if consecutive_empty >= 2:
-                break
-            time.sleep(0.5)
+        if nb_total_pass == 0:
             continue
+
+        start_page        = 2 if fallback_used else 1
         consecutive_empty = 0
-        new_count = 0
-        for it in items:
-            tid = str(it.get("id", ""))
-            if tid and tid not in all_items:
-                all_items[tid] = it
-                new_count += 1
-        if new_count == 0:
-            break
-        time.sleep(0.2)
+
+        for page_num in range(start_page, 99999):
+            items, _ = ajax_ligue_page(session, fbid, page_num, date_start, date_end,
+                                       sort_order=sort_order)
+            if not items:
+                consecutive_empty += 1
+                if consecutive_empty >= 2:
+                    break
+                time.sleep(0.5)
+                continue
+            consecutive_empty = 0
+            new_count = 0
+            for it in items:
+                tid = str(it.get("id", ""))
+                if tid and tid not in all_items:
+                    all_items[tid] = it
+                    new_count += 1
+            if new_count == 0:
+                break
+            time.sleep(0.2)
 
     print(f"  {ligue_name} : nb_total={nb_total} → {len(all_items)} uniques scrapés")
     return list(all_items.values()), nb_total
