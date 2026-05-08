@@ -110,21 +110,13 @@ def get_comites(session, ligue_id):
             if attempt == 1 and ligue_id == LIGUES[0]["id"]:
                 print(f"    [comite/ajax format] keys={list(result.keys()) if isinstance(result, dict) else type(result).__name__}")
                 print(f"    [comite/ajax sample] {str(result)[:300]}")
-            # Extraire comités : plusieurs formats possibles
+            # Format confirmé : [{"code": "50", "option": {"5001": "AIN", ...}, ...}]
             comites = {}
-            if isinstance(result, dict):
-                for k, v in result.items():
-                    if isinstance(v, dict):  # {comite_id: {name: ...}} ou {id: name}
-                        for ck, cv in v.items():
-                            comites[ck] = cv if isinstance(cv, str) else str(cv)
-                    elif isinstance(v, list):  # [{id: ..., name: ...}]
-                        for item in v:
-                            if isinstance(item, dict) and "id" in item:
-                                comites[str(item["id"])] = item.get("name", str(item["id"]))
-            elif isinstance(result, list):
+            if isinstance(result, list):
                 for item in result:
-                    if isinstance(item, dict) and "id" in item:
-                        comites[str(item["id"])] = item.get("name", str(item["id"]))
+                    if isinstance(item, dict) and str(item.get("code", "")) == str(ligue_id):
+                        comites = {str(k): str(v) for k, v in item.get("option", {}).items()}
+                        break
             return comites
         except Exception as e:
             if attempt < RETRY_MAX:
@@ -188,7 +180,7 @@ def ajax_ligue_page(session, fbid, page_num, date_start, date_end):
         "pratique": "PADEL",
         "date[start]": date_start,
         "date[end]":   date_end,
-        "sort": "_DIST_",
+        "sort": "dateDebut asc",
         "form_id": "recherche_tournois_form",
         "_triggering_element_name":  trigger_name,
         "_triggering_element_value": trigger_value,
