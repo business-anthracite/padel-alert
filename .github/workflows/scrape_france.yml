@@ -27,4 +27,4 @@ jobs:
           playwright install chromium --with-deps
 
       - name: Scraper TenUp et ecrire tournaments.json (v9 â€” par comite)
-        run: python backend/scraper_france_v9.py
+        run: python backend/scraper_france_v10.py
