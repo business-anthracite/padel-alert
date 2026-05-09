@@ -1,4 +1,4 @@
-name: "Padel Alert â€” Scraping France"
+name: "Padel Alert - Scraping France"
 
 on:
   schedule:
@@ -26,5 +26,5 @@ jobs:
           pip install -r backend/requirements_france.txt
           playwright install chromium --with-deps
 
-      - name: Scraper TenUp et ecrire tournaments.json (v9 â€” par comite)
-        run: python backend/scraper_france_v10.py
+      - name: Scraper TenUp (v8 - par ligue FFT)
+        run: python backend/scraper_france_v8.py
