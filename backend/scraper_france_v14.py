@@ -1,21 +1,21 @@
 """
-Padel Alert â€” Scraper France v14 â€” fix ordre fbid/filtre comitÃ©
+Padel Alert — Scraper France v14 — fix ordre fbid/filtre comité
 
-Diagnostic dÃ©finitif :
-  Test navigateur (Baptiste 09/05/2026) : submit_page respecte le filtre comitÃ© âœ“
-  Bug v9-v11 : refresh_fbid() appelÃ© APRÃˆS set_comite_filter() â†’ rÃ©initialise la
-               session PHP â†’ filtre comitÃ© effacÃ© avant submit_main/submit_page.
+Diagnostic définitif :
+  Test navigateur (Baptiste 09/05/2026) : submit_page respecte le filtre comité ✓
+  Bug v9-v11 : refresh_fbid() appelé APRÈS set_comite_filter() → réinitialise la
+               session PHP → filtre comité effacé avant submit_main/submit_page.
 
-Fix v14 : refresh_fbid() AVANT set_comite_filter() pour chaque comitÃ©.
-  1. refresh_fbid()                         â†’ fbid propre, session intacte
-  2. set_comite_filter(comite, [all]=0)      â†’ session PHP = {comite: filtrÃ©}
-  3. submit_main (page 0)                   â†’ retourne comitÃ©-filtrÃ© âœ“
-  4. submit_page (pages 1-N)                â†’ mÃªme session â†’ comitÃ©-filtrÃ© âœ“
+Fix v14 : refresh_fbid() AVANT set_comite_filter() pour chaque comité.
+  1. refresh_fbid()                         → fbid propre, session intacte
+  2. set_comite_filter(comite, [all]=0)      → session PHP = {comite: filtré}
+  3. submit_main (page 0)                   → retourne comité-filtré ✓
+  4. submit_page (pages 1-N)                → même session → comité-filtré ✓
 
-Architecture : par comitÃ©, fenÃªtre 90 jours complÃ¨te.
-Pas de dÃ©coupage en pÃ©riodes (inutile si filtre fonctionne correctement).
-ISÃˆRE max = 647 rÃ©sultats = 22 pages â†’ sous le plafond Drupal (~40 pages).
-Run estimÃ© : 18 ligues Ã— avg 8 comitÃ©s Ã— avg 12 pages Ã— 0.4s â‰ˆ 25 min.
+Architecture : par comité, fenêtre 90 jours complète.
+Pas de découpage en périodes (inutile si filtre fonctionne correctement).
+ISÈRE max = 647 résultats = 22 pages → sous le plafond Drupal (~40 pages).
+Run estimé : 18 ligues × avg 8 comités × avg 12 pages × 0.4s ≈ 25 min.
 """
 import os, json, subprocess, time, re
 from datetime import datetime, timedelta
@@ -33,28 +33,28 @@ RETRY_MAX    = 3
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
 LIGUES = [
-    {"id": 50, "name": "Auvergne-RhÃ´ne-Alpes"},
-    {"id": 51, "name": "Bourgogne-Franche-ComtÃ©"},
+    {"id": 50, "name": "Auvergne-Rhône-Alpes"},
+    {"id": 51, "name": "Bourgogne-Franche-Comté"},
     {"id": 52, "name": "Bretagne"},
     {"id": 53, "name": "Centre-Val de Loire"},
     {"id": 54, "name": "Corse"},
     {"id": 55, "name": "Grand Est"},
     {"id": 56, "name": "Hauts-de-France"},
-    {"id": 57, "name": "ÃŽle-de-France"},
+    {"id": 57, "name": "Île-de-France"},
     {"id": 58, "name": "Normandie"},
     {"id": 59, "name": "Nouvelle-Aquitaine"},
     {"id": 60, "name": "Occitanie"},
     {"id": 61, "name": "Pays de la Loire"},
-    {"id": 62, "name": "Provence-Alpes-CÃ´te d'Azur"},
+    {"id": 62, "name": "Provence-Alpes-Côte d'Azur"},
     {"id": 63, "name": "Guadeloupe"},
     {"id": 64, "name": "Guyane"},
     {"id": 65, "name": "Martinique"},
-    {"id": 66, "name": "Nouvelle-CalÃ©donie"},
-    {"id": 67, "name": "RÃ©union"},
+    {"id": 66, "name": "Nouvelle-Calédonie"},
+    {"id": 67, "name": "Réunion"},
 ]
 
 
-# â”€â”€ Session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Session ────────────────────────────────────────────────────────────────────
 
 def get_session():
     print("Ouverture Ten'Up via Playwright...")
@@ -72,15 +72,15 @@ def get_session():
         browser.close()
     if not fbid:
         raise RuntimeError("form_build_id introuvable")
-    print(f"Session OK â€” fbid: {fbid[:35]}...")
+    print(f"Session OK — fbid: {fbid[:35]}...")
     return fbid, cookies
 
 
 def refresh_fbid(session):
     """
-    GET /recherche/tournois â†’ nouveau form_build_id.
-    ATTENTION : appeler AVANT set_comite_filter, pas aprÃ¨s.
-    Un GET sur la page de recherche peut rÃ©initialiser les variables de session PHP.
+    GET /recherche/tournois → nouveau form_build_id.
+    ATTENTION : appeler AVANT set_comite_filter, pas après.
+    Un GET sur la page de recherche peut réinitialiser les variables de session PHP.
     """
     try:
         resp = session.get(TENUP_SEARCH, timeout=30)
@@ -106,7 +106,7 @@ def make_session(cookies):
     return s
 
 
-# â”€â”€ Vue.js endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Vue.js endpoints ───────────────────────────────────────────────────────────
 
 def get_comites(session, ligue_id):
     data = {f"selectedLigue[{ligue_id}]": str(ligue_id)}
@@ -136,9 +136,9 @@ def get_comites(session, ligue_id):
 
 def set_comite_filter(session, ligue_id, comite_id, comite_name):
     """
-    Stocke le filtre comitÃ© dans la session PHP.
-    [all]=0 : "seuls les comitÃ©s listÃ©s sont sÃ©lectionnÃ©s".
-    Appeler APRÃˆS refresh_fbid(), pas avant.
+    Stocke le filtre comité dans la session PHP.
+    [all]=0 : "seuls les comités listés sont sélectionnés".
+    Appeler APRÈS refresh_fbid(), pas avant.
     """
     data = {
         f"selectedLigue[{ligue_id}][{comite_id}]": comite_name,
@@ -161,12 +161,12 @@ def set_comite_filter(session, ligue_id, comite_id, comite_name):
     return False
 
 
-# â”€â”€ AJAX recherche â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── AJAX recherche ─────────────────────────────────────────────────────────────
 
 def ajax_page(session, fbid, page_num, date_start, date_end):
     """
     submit_main (page 0) ou submit_page (pages 1+).
-    Le filtre comitÃ© doit Ãªtre en session PHP avant cet appel.
+    Le filtre comité doit être en session PHP avant cet appel.
     Retourne (items, nb_results).
     """
     if page_num == 0:
@@ -214,27 +214,27 @@ def ajax_page(session, fbid, page_num, date_start, date_end):
     return [], 0
 
 
-# â”€â”€ Scraping d'un comitÃ© (fenÃªtre 90 jours complÃ¨te) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Scraping d'un comité (fenêtre 90 jours complète) ──────────────────────────
 
 def scrape_comite(session, ligue_id, ligue_name, comite_id, comite_name,
                   date_start, date_end, all_items):
     """
-    Ordre correct : refresh_fbid â†’ set_comite_filter â†’ submit_main â†’ submit_page Ã— N.
-    FenÃªtre 90 jours complÃ¨te sans dÃ©coupage (ISÃˆRE max = 647 = 22 pages < plafond 40).
+    Ordre correct : refresh_fbid → set_comite_filter → submit_main → submit_page × N.
+    Fenêtre 90 jours complète sans découpage (ISÈRE max = 647 = 22 pages < plafond 40).
     """
-    # Ã‰tape 1 : fbid frais (AVANT le filtre, pas aprÃ¨s)
+    # Étape 1 : fbid frais (AVANT le filtre, pas après)
     cur_fbid = refresh_fbid(session)
     if not cur_fbid:
-        print(f"      âœ— refresh_fbid Ã©chouÃ© pour {comite_name}")
+        print(f"      ✗ refresh_fbid échoué pour {comite_name}")
         return 0, 0
 
-    # Ã‰tape 2 : filtre comitÃ© dans la session PHP (APRÃˆS fbid)
+    # Étape 2 : filtre comité dans la session PHP (APRÈS fbid)
     ok = set_comite_filter(session, ligue_id, comite_id, comite_name)
     if not ok:
-        print(f"      âœ— set_comite_filter Ã©chouÃ© pour {comite_name}")
+        print(f"      ✗ set_comite_filter échoué pour {comite_name}")
         return 0, 0
 
-    # Ã‰tape 3 : submit_main
+    # Étape 3 : submit_main
     items0, nb_total = ajax_page(session, cur_fbid, 0, date_start, date_end)
 
     if not items0 and nb_total == 0:
@@ -259,7 +259,7 @@ def scrape_comite(session, ligue_id, ligue_name, comite_id, comite_name,
     cap = nb_total if nb_total > 0 else 99999
     consecutive_empty = 0
 
-    # Ã‰tape 4 : submit_page Ã— N (session PHP conserve le filtre comitÃ©)
+    # Étape 4 : submit_page × N (session PHP conserve le filtre comité)
     for page_num in range(1, 9999):
         if collected >= cap:
             break
@@ -288,7 +288,7 @@ def scrape_comite(session, ligue_id, ligue_name, comite_id, comite_name,
     return added, nb_total if nb_total > 0 else collected
 
 
-# â”€â”€ Scraping d'une ligue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Scraping d'une ligue ───────────────────────────────────────────────────────
 
 def scrape_ligue(session, ligue, date_start, date_end):
     ligue_id   = ligue["id"]
@@ -296,7 +296,7 @@ def scrape_ligue(session, ligue, date_start, date_end):
     all_items  = {}
 
     comites = get_comites(session, ligue_id)
-    print(f"  {ligue_name} : {len(comites)} comitÃ©s")
+    print(f"  {ligue_name} : {len(comites)} comités")
 
     if not comites:
         return [], 0
@@ -310,14 +310,14 @@ def scrape_ligue(session, ligue, date_start, date_end):
             date_start, date_end, all_items
         )
         nb_total_ligue += nb
-        print(f"    {comite_name}: {nb} total â†’ {added} nouveaux (cumul: {len(all_items)})")
+        print(f"    {comite_name}: {nb} total → {added} nouveaux (cumul: {len(all_items)})")
         time.sleep(0.4)
 
-    print(f"  {ligue_name} : nb_totalâ‰ˆ{nb_total_ligue} â†’ {len(all_items)} uniques scrapÃ©s")
+    print(f"  {ligue_name} : nb_total≈{nb_total_ligue} → {len(all_items)} uniques scrapés")
     return list(all_items.values()), nb_total_ligue
 
 
-# â”€â”€ Parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Parsing ────────────────────────────────────────────────────────────────────
 
 def parse_item(item):
     tid = str(item.get("id", ""))
@@ -346,7 +346,7 @@ def parse_item(item):
                 try:
                     d2 = datetime.strptime(date_fin[:10], "%Y-%m-%d")
                     if d2.year >= 2000:
-                        date_str += f" â†’ {JOURS[d2.weekday()]} {d2.strftime('%d/%m/%Y')}"
+                        date_str += f" → {JOURS[d2.weekday()]} {d2.strftime('%d/%m/%Y')}"
                 except Exception:
                     pass
         except Exception:
@@ -397,13 +397,13 @@ def parse_item(item):
     }
 
 
-# â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
     now        = datetime.now()
     date_start = now.strftime("%d/%m/%y")
     date_end   = (now + timedelta(days=HORIZON_DAYS)).strftime("%d/%m/%y")
-    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert â€” Scraper v14 â€” {len(LIGUES)} ligues ({date_start}â†’{date_end})")
+    print(f"[{now.strftime('%Y-%m-%d %H:%M')}] Padel Alert — Scraper v14 — {len(LIGUES)} ligues ({date_start}→{date_end})")
 
     fbid, cookies = get_session()
     session = make_session(cookies)
@@ -418,18 +418,21 @@ def main():
             tid = str(item.get("id", ""))
             if tid and tid not in all_raw:
                 all_raw[tid] = item
-        print(f"  â†’ Total cumulÃ© France : {len(all_raw)} uniques")
+        print(f"  → Total cumulé France : {len(all_raw)} uniques")
         time.sleep(0.5)
 
     tournaments = [t for item in all_raw.values() if (t := parse_item(item))]
 
     elapsed = (datetime.now() - now).total_seconds()
+    total_brut = sum(s["nb_total"] for s in stats.values())
+    facteur = total_brut / len(tournaments) if tournaments else 0
     print(f"\n{'='*60}")
     print(f"Total France : {len(tournaments)} tournois uniques ({elapsed:.0f}s / {elapsed/60:.1f}min)")
-    print("\nDÃ©tail par ligue :")
+    print(f"Lignes brutes traitées avant dédup : ~{total_brut} (facteur ×{facteur:.2f})")
+    print("\nDétail par ligue :")
     for name, s in sorted(stats.items(), key=lambda x: -x[1]["nb_total"]):
         pct = round(100 * s["scraped"] / s["nb_total"]) if s["nb_total"] > 0 else 0
-        print(f"  {name}: {s['nb_total']} â†’ {s['scraped']} scrapÃ©s ({pct}%)")
+        print(f"  {name}: {s['nb_total']} → {s['scraped']} scrapés ({pct}%)")
 
     os.makedirs("data", exist_ok=True)
     payload = {
@@ -439,22 +442,22 @@ def main():
     }
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
-    print(f"\nFichier Ã©crit : {OUTPUT_FILE}")
+    print(f"\nFichier écrit : {OUTPUT_FILE}")
 
     subprocess.run(["git", "config", "user.email", "actions@github.com"], check=True)
     subprocess.run(["git", "config", "user.name",  "padel-alert-bot"],    check=True)
     subprocess.run(["git", "add", OUTPUT_FILE], check=True)
     diff = subprocess.run(["git", "diff", "--cached", "--quiet"], capture_output=True)
     if diff.returncode != 0:
-        msg = f"Scraping v14 [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] â€” {len(tournaments)} tournois"
+        msg = f"Scraping v14 [{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} UTC] — {len(tournaments)} tournois"
         subprocess.run(["git", "commit", "-m", msg], check=True)
         subprocess.run(["git", "pull", "--rebase"], check=True)
         subprocess.run(["git", "push"], check=True)
-        print("Commit pushÃ©.")
+        print("Commit pushé.")
     else:
         print("Aucun changement.")
 
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] TerminÃ©.")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Terminé.")
 
 
 if __name__ == "__main__":
