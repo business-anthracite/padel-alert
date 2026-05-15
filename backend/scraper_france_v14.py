@@ -32,6 +32,18 @@ RETRY_MAX    = 3
 
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
+# Mapping libelle → code numérique pour les catégories d'âge Ten'Up
+AGE_CODE_MAP = {
+    "Senior":    "200",
+    "+45 ans":   "345",
+    "+55 ans":   "355",
+    "17/18":     "1718", "17/18 ans": "1718",
+    "15/16":     "1516", "15/16 ans": "1516",
+    "13/14":     "1314", "13/14 ans": "1314",
+    "11/12":     "1112", "11/12 ans": "1112",
+    "9/10":      "910",  "9/10 ans":  "910",
+}
+
 LIGUES = [
     {"id": 50, "name": "Auvergne-Rhône-Alpes"},
     {"id": 51, "name": "Bourgogne-Franche-Comté"},
@@ -363,9 +375,10 @@ def parse_item(item):
         niv = (e.get("typeEpreuve") or {}).get("code", "")
         if niv:
             niveau_codes.add(niv)
-        age_lib = (e.get("categorieAge") or {}).get("libelle", "")
-        if age_lib:
-            age_codes.add(age_lib)
+        age_raw  = (e.get("categorieAge") or {})
+        age_code = age_raw.get("code", "") or AGE_CODE_MAP.get(age_raw.get("libelle", ""), "")
+        if age_code:
+            age_codes.add(age_code)
         comp = (e.get("typeCompetition") or {}).get("code", "")
         if comp:
             competition_codes.add(comp)
