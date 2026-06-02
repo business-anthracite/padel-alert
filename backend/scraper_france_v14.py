@@ -78,7 +78,13 @@ def get_session():
         )
         page = ctx.new_page()
         page.goto(TENUP_SEARCH, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(7000)
+        try:
+            page.wait_for_selector('[name="form_build_id"]', timeout=30000)
+        except Exception:
+            title   = page.title()
+            snippet = page.evaluate("() => (document.body?.innerText || '').substring(0, 600)")
+            print(f"[DEBUG] Titre page : {title!r}")
+            print(f"[DEBUG] Body snippet : {snippet!r}")
         fbid    = page.evaluate("() => document.querySelector('[name=\"form_build_id\"]')?.value")
         cookies = {c["name"]: c["value"] for c in ctx.cookies()}
         browser.close()
