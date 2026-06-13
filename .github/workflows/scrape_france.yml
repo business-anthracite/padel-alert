@@ -26,5 +26,5 @@ jobs:
           pip install -r backend/requirements_france.txt
           playwright install chromium --with-deps
 
-      - name: Scraper TenUp (v14 - par comite)
-        run: python backend/scraper_france_v14.py
+      - name: Scraper TenUp (v15 - par comite + ligue entiere)
+        run: python backend/scraper_france_v15.py
