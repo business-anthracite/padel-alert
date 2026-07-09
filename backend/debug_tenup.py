@@ -1,6 +1,7 @@
-"""Diagnostic Ten'Up phase 11 (09/07/2026) - Export tournois SANS niveau extractible.
-Dump CSV (tab-separated) des cards padel dont le libelle n'a ni P## ni 'championnat',
-pour livrable Excel. Categorisation pour comprendre ce que sont ces 12%.
+"""Diagnostic Ten'Up phase 13 (09/07) - SOURCE DES COORDONNEES.
+L'API tournois ne renvoie pas lat/lng pour la plupart des clubs. Objectif :
+1. Mesurer la couverture coords national vs par-ligue
+2. Trouver un endpoint club (par code) donnant CP / coords
 """
 import json
 import re
@@ -10,82 +11,76 @@ TENUP_BASE = "https://tenup.fft.fr"
 API = f"{TENUP_BASE}/back/public/v1/tournois"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-# Codes ligue -> nom (pour tagger)
-LIGUES = {50:"Auvergne-Rhone-Alpes",51:"Bourgogne-Franche-Comte",52:"Bretagne",
-53:"Centre-Val de Loire",54:"Corse",55:"Grand Est",56:"Hauts-de-France",
-57:"Ile-de-France",58:"Normandie",59:"Nouvelle-Aquitaine",60:"Occitanie",
-61:"Pays de la Loire",62:"Provence-Alpes-Cote d'Azur",63:"Guadeloupe",64:"Guyane",
-65:"Martinique",66:"Nouvelle-Caledonie",67:"Reunion"}
-
 s = requests.Session()
 s.headers.update({"User-Agent": UA, "Accept": "application/json, text/plain, */*",
                   "Content-Type": "application/json", "Origin": TENUP_BASE,
                   "Referer": f"{TENUP_BASE}/recherche/tournois/resultats"})
 
-NIV = re.compile(r'P[\s\-]?(25|50|100|250|500|1000|1500|2000)(?!\d)', re.IGNORECASE)
-
-base = {"pratique":"PADEL","from":0,"size":5000,"lat":None,"lng":None,"distance":30,
+base = {"pratique":"PADEL","from":0,"size":300,"lat":None,"lng":None,"distance":30,
 "type":[],"codeClub":None,"ligues":[],"comites":[],"dateDebut":"2026-07-09T00:00:00.000Z",
 "dateFin":"2026-10-09T00:00:00.000Z","utiliserMesDonnees":False,"naturesEpreuves":[],
 "typesEpreuves":[],"naturesTerrains":[],"categoriesJeu":[],"categoriesAge":[],"familles":[],
 "tournoiInterne":False,"classements":[],"inscriptionEnLigne":None,"paiementEnLigne":None,
 "filtres":True,"sort":"DISTANCE"}
 
-# Une requete par ligue pour avoir le tag ligue
-by_id = {}
-for lid, lname in LIGUES.items():
-    d = s.post(API, data=json.dumps({**base, "ligues":[str(lid)]}), timeout=60).json()
-    for c in d.get("cards", []):
-        idh = c.get("idHomologation","")
-        if idh not in by_id:
-            c["_ligue"] = lname
-            by_id[idh] = c
-
-cards = list(by_id.values())
-no_level = []
+print("=== 1. Couverture coords (national, 300) ===")
+d = s.post(API, data=json.dumps(base), timeout=60).json()
+cards = d.get("cards", [])
+withc = sum(1 for c in cards if (c.get("club") or {}).get("lat"))
+print(f"cards {len(cards)} | avec club.lat : {withc}")
+# Exemples de clubs SANS coords
+sample_codes = []
 for c in cards:
-    lib = c.get("libelleTournoi","") or ""
-    if NIV.search(lib):
-        continue
-    if "championnat" in lib.lower():
-        continue
-    no_level.append(c)
+    club = c.get("club") or {}
+    if not club.get("lat"):
+        sample_codes.append(club.get("code"))
+    if len(sample_codes) >= 5:
+        break
+print("codes clubs sans coords:", sample_codes)
+print("cles completes d'une card:", sorted(cards[0].keys()))
+print("exemple club complet:", json.dumps(cards[0].get("club"), ensure_ascii=False))
 
-print(f"TOTAL cards (dedup ligue): {len(cards)}")
-print(f"SANS niveau ni championnat: {len(no_level)}")
+# 2. Endpoints clubs candidats (par code)
+code = next((c for c in sample_codes if c), None)
+print(f"\n=== 2. Recherche endpoint club (code={code}) ===")
+candidates = [
+    ("GET", f"/back/public/v1/clubs/{code}"),
+    ("GET", f"/back/public/v1/club/{code}"),
+    ("GET", f"/back/public/v1/clubs/{code}?environment=web_prod"),
+    ("GET", f"/back/public/v1/clubs/formulaire"),
+    ("POST","/back/public/v1/clubs"),
+    ("POST","/back/public/v1/clubs/resultats"),
+    ("GET", f"/back/public/v1/installations/{code}"),
+]
+for method, path in candidates:
+    url = TENUP_BASE + path
+    try:
+        if method == "GET":
+            r = s.get(url, timeout=25, allow_redirects=False)
+        else:
+            r = s.post(url, data=json.dumps({"pratique":"PADEL","from":0,"size":5,"nom":"","ligues":[],"comites":[]}), timeout=25, allow_redirects=False)
+        ct = r.headers.get("content-type","")[:30]
+        print(f"\n{method} {path} -> {r.status_code} | {ct}")
+        if "json" in ct and r.status_code == 200:
+            body = r.text
+            print("  a 'codePostal':", "codepostal" in body.lower() or "codePostal" in body)
+            print("  a 'lat':", '"lat"' in body, "| a 'adresse':", "adresse" in body.lower())
+            print("  JSON[:500]:", body[:500].replace(chr(10)," "))
+        elif "json" in ct:
+            print("  body:", r.text[:200].replace(chr(10)," "))
+    except Exception as e:
+        print(f"\n{method} {path} -> EXC {str(e)[:80]}")
 
-# Categorisation rapide
-cats = {}
-for c in no_level:
-    lib = (c.get("libelleTournoi","") or "").lower()
-    if "jeune" in lib or "u10" in lib or "u12" in lib or "u14" in lib or "u16" in lib or "u18" in lib:
-        k = "jeunes"
-    elif "beach" in lib:
-        k = "beach"
-    elif re.search(r'\bp\d', lib):
-        k = "p_minuscule_ou_colle"
-    elif "tmc" in lib:
-        k = "TMC"
-    else:
-        k = "autre"
-    cats[k] = cats.get(k,0)+1
-print("CATEGORIES:", cats)
+# 3. La recherche clubs (page /recherche/clubs) - capturer via l'endpoint devine
+print("\n=== 3. POST /back/public/v1/clubs avec filtre nom ===")
+for payload in [
+    {"nom":"","codeClub":sample_codes[0] if sample_codes else "","from":0,"size":5},
+    {"pratique":"PADEL","from":0,"size":5,"nom":"","ligues":[],"comites":[],"lat":None,"lng":None,"distance":30},
+]:
+    try:
+        r = s.post(f"{TENUP_BASE}/back/public/v1/clubs", data=json.dumps(payload), timeout=25)
+        print(f"payload {list(payload.keys())} -> {r.status_code} | {r.text[:300].replace(chr(10),' ')}")
+    except Exception as e:
+        print("EXC", str(e)[:80])
 
-# Dump CSV (marqueur pour extraction)
-print("###CSV_START###")
-print("\t".join(["idHomologation","libelleTournoi","club","ville","dateDebut","dateFin","ligue","naturesEpreuves"]))
-for c in no_level:
-    club = (c.get("club") or {}).get("libelle","") or ""
-    row = [
-        c.get("idHomologation",""),
-        (c.get("libelleTournoi","") or "").replace("\t"," ").replace("\n"," "),
-        club.replace("\t"," "),
-        (c.get("ville","") or "").replace("\t"," "),
-        c.get("dateDebut","") or "",
-        c.get("dateFin","") or "",
-        c.get("_ligue",""),
-        ",".join(c.get("naturesEpreuves") or []),
-    ]
-    print("###ROW###" + "\t".join(row))
-print("###CSV_END###")
-print("DIAGNOSTIC PHASE 11 TERMINE")
+print("\nDIAGNOSTIC PHASE 13 TERMINE")
