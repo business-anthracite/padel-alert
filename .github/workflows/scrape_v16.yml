@@ -1,0 +1,33 @@
+name: "Padel Alert - Scraping France v16"
+
+on:
+  schedule:
+    - cron: "0 * * * *"      # horaire (aligne sur le pull WordPress a :10)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Empeche deux runs concurrents de se marcher dessus (push sur la meme branche)
+concurrency:
+  group: scrape-v16-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dependances (requests uniquement - plus de Playwright)
+        run: pip install requests
+
+      - name: Scraper Ten'Up (v16 - API back/public/v1/tournois)
+        run: python backend/scraper_france_v16.py
