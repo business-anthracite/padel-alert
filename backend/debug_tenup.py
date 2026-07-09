@@ -1,6 +1,6 @@
-"""Diagnostic Ten'Up phase 3 (09/07/2026) - TEMPORAIRE.
-Objectif : cartographier la nouvelle API (/back/public/...) en analysant
-les bundles JS de l'app Nuxt + tenter la recherche avec le bon bouton.
+"""Diagnostic Ten'Up phase 4 (09/07/2026) - TEMPORAIRE.
+1. Scan des 60 chunks JS Nuxt -> carte des endpoints back/public
+2. Recherche Padel simulee APRES fermeture du popup cookies -> capture des appels
 """
 import re
 import time
@@ -9,19 +9,57 @@ from playwright.sync_api import sync_playwright
 
 TENUP_BASE   = "https://tenup.fft.fr"
 TENUP_SEARCH = f"{TENUP_BASE}/recherche/tournois"
+ENTRY_JS     = f"{TENUP_BASE}/_nuxt/D1gS3xjv.js"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
+print("=== 1. SCAN DES BUNDLES JS ===")
+s = requests.Session()
+s.headers.update({"User-Agent": UA})
+try:
+    entry = s.get(ENTRY_JS, timeout=30)
+    print("entry status:", entry.status_code, "taille:", len(entry.text))
+    chunks = sorted(set(re.findall(r'[A-Za-z0-9_\-]{6,14}\.js', entry.text)))
+    print("chunks detectes:", len(chunks))
+    endpoints = set()
+    api_hints = set()
+    scanned = 0
+    for c in chunks:
+        try:
+            r = s.get(f"{TENUP_BASE}/_nuxt/{c}", timeout=20)
+            if r.status_code != 200:
+                continue
+            scanned += 1
+            js = r.text
+            for m in re.findall(r'back/public/[A-Za-z0-9_/${}.\-]{2,90}', js):
+                endpoints.add(m)
+            for m in re.findall(r'["`](/[a-z][a-z0-9_/\-]{3,60}/(?:recherche|search|tournoi|tournois|competition)[a-z0-9_/\-]*)["`]', js):
+                api_hints.add(m if isinstance(m, str) else m[0])
+        except Exception:
+            pass
+    print(f"chunks scannes: {scanned}")
+    print(f"\nENDPOINTS back/public ({len(endpoints)}) :")
+    for e in sorted(endpoints):
+        print("   ", e)
+    print(f"\nAUTRES ROUTES api candidates ({len(api_hints)}) :")
+    for e in sorted(api_hints):
+        print("   ", e)
+except Exception as e:
+    print("scan ECHEC:", str(e)[:200])
+
+print("\n=== 2. RECHERCHE SIMULEE (popup ferme d abord) ===")
 captured = []
 
 def on_response(resp):
     req = resp.request
     if req.resource_type not in ("xhr", "fetch"):
         return
+    if "tenup" not in req.url and "fft" not in req.url:
+        return
     entry = {"method": req.method, "url": req.url[:250], "status": resp.status,
-             "post": (req.post_data or "")[:400]}
+             "post": (req.post_data or "")[:500]}
     try:
         if "json" in resp.headers.get("content-type", ""):
-            entry["body"] = resp.text()[:500]
+            entry["body"] = resp.text()[:700]
     except Exception:
         pass
     captured.append(entry)
@@ -38,88 +76,51 @@ with sync_playwright() as p:
     except Exception:
         pass
 
-    print("=== BOUTONS VISIBLES ===")
-    btns = page.evaluate("() => [...document.querySelectorAll('button, [role=button], input[type=submit]')].map(b => (b.innerText||b.value||'').trim().replace(/\\s+/g,' ').substring(0,60)).filter(t => t)")
-    for b in btns:
-        print("   [", b, "]")
+    # 2a. Fermer le popup cookies (bloquait tous les clics en phase 3)
+    closed = False
+    for pattern in [r"tout refuser", r"tout accepter"]:
+        try:
+            page.get_by_role("button", name=re.compile(pattern, re.I)).first.click(timeout=4000)
+            print(f"[popup ferme via '{pattern}']")
+            closed = True
+            break
+        except Exception:
+            pass
+    if not closed:
+        print("[popup non trouve - peut-etre absent]")
+    time.sleep(1)
 
-    print("\n=== RUNTIME CONFIG NUXT ===")
+    # 2b. Cliquer le bouton Padel (role button)
     try:
-        cfg = page.evaluate("() => JSON.stringify(window.__NUXT__ && (window.__NUXT__.config || window.__NUXT__.state || {})).substring(0, 1500)")
-        print(cfg)
-    except Exception as e:
-        print("(indisponible)", str(e)[:100])
-
-    print("\n=== SCRIPTS NUXT ===")
-    scripts = page.evaluate("() => [...document.querySelectorAll('script[src]')].map(s => s.src)")
-    nuxt_js = [u for u in scripts if "_nuxt" in u]
-    for u in nuxt_js:
-        print("   ", u)
-
-    cookies = {c["name"]: c["value"] for c in ctx.cookies()}
-
-    # Tentative recherche avec le bouton de la zone de formulaire (dernier RECHERCHER)
-    print("\n=== TENTATIVE RECHERCHE (dernier bouton RECHERCHER) ===")
-    try:
-        page.get_by_text("Padel", exact=True).last.click(timeout=4000)
-        print("[clic Padel OK]")
+        page.get_by_role("button", name=re.compile(r"^padel$", re.I)).first.click(timeout=5000)
+        print("[clic bouton Padel OK]")
     except Exception as e:
         print("[clic Padel ECHEC]", str(e)[:100])
     time.sleep(1)
+
+    # 2c. Cliquer le RECHERCHER du formulaire (le dernier)
     try:
-        page.get_by_role("button", name=re.compile("rechercher", re.I)).last.click(timeout=4000)
-        print("[clic bouton RECHERCHER (role) OK]")
+        page.get_by_role("button", name=re.compile(r"rechercher", re.I)).last.click(timeout=5000)
+        print("[clic RECHERCHER (form) OK]")
     except Exception as e:
-        print("[clic role ECHEC]", str(e)[:100])
-        try:
-            page.get_by_text("RECHERCHER", exact=False).last.click(timeout=4000)
-            print("[clic texte RECHERCHER (last) OK]")
-        except Exception as e2:
-            print("[clic texte ECHEC]", str(e2)[:100])
-    time.sleep(8)
+        print("[clic RECHERCHER ECHEC]", str(e)[:100])
+
+    time.sleep(10)
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception:
+        pass
     print("URL apres recherche :", page.url)
-    snippet = page.evaluate("() => (document.body.innerText||'').replace(/\\s+/g,' ').substring(0, 500)")
+    snippet = page.evaluate("() => (document.body.innerText||'').replace(/\\s+/g,' ').substring(0, 600)")
     print("Body apres recherche :", snippet)
     browser.close()
 
-print(f"\n=== APPELS XHR/FETCH ({len(captured)}) - TOUS ===")
+print(f"\n=== APPELS TENUP/FFT CAPTURES ({len(captured)}) ===")
 for e in captured:
     print(f"\n{e['method']} {e['url']}  -> {e['status']}")
     if e.get("post"):
         print("  POST :", e["post"])
     if e.get("body"):
-        print("  JSON :", e["body"].replace(chr(10), " ")[:400])
+        print("  JSON :", e["body"].replace(chr(10), " ")[:700])
 
-print("\n=== ANALYSE DES BUNDLES JS (endpoints back/public) ===")
-s = requests.Session()
-s.headers.update({"User-Agent": UA})
-for k, v in cookies.items():
-    s.cookies.set(k, v)
-endpoints = set()
-for u in nuxt_js[:15]:
-    try:
-        js = s.get(u, timeout=30).text
-    except Exception:
-        continue
-    for m in re.findall(r'back/public/[A-Za-z0-9_/${}.\-]{2,80}', js):
-        endpoints.add(m)
-    # imports dynamiques : recuperer aussi les chunks references
-    for chunk in re.findall(r'"(\./)?([A-Za-z0-9_.\-]+\.js)"', js)[:0]:
-        pass
-print(f"Endpoints trouves dans {len(nuxt_js[:15])} bundles :")
-for e in sorted(endpoints):
-    print("   ", e)
-
-if not endpoints:
-    print("(aucun - les endpoints sont peut-etre dans des chunks lazy-loades)")
-    # fallback : lister les chunks du manifest
-    try:
-        js = s.get(nuxt_js[0], timeout=30).text if nuxt_js else ""
-        chunks = sorted(set(re.findall(r'[A-Za-z0-9_.\-]+\.js', js)))[:60]
-        print("Chunks references par l entry :", len(chunks))
-        for c in chunks[:40]:
-            print("   ", c)
-    except Exception:
-        pass
-
-print("\nDIAGNOSTIC PHASE 3 TERMINE")
+print("\nDIAGNOSTIC PHASE 4 TERMINE")
