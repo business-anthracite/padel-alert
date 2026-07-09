@@ -1,102 +1,101 @@
-"""Diagnostic Ten'Up phase 7 (09/07/2026) - TEMPORAIRE. Capture de l'API de resultats.
-1. Naviguer directement vers /recherche/tournois/resultats -> capturer les XHR
-2. Sonder en direct les endpoints /back/public/v1/tournois/*
+"""Diagnostic Ten'Up phase 8 (09/07/2026) - TEMPORAIRE. Validation API v16.
+1. Cookies via Playwright (passage Queue-it) - minimal
+2. Test API PADEL sans navigateur : gros size, champs niveaux, volume national
 """
 import json
-import re
 import time
 import requests
 from playwright.sync_api import sync_playwright
 
 TENUP_BASE = "https://tenup.fft.fr"
-RESULTS    = f"{TENUP_BASE}/recherche/tournois/resultats"
+API = f"{TENUP_BASE}/back/public/v1/tournois"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-captured = []
-AD = ("doubleclick", "googlesyndication", "adtrafficquality", "googletag", "google-analytics", "gstatic", "sodar", "iconify", "simplesvg", "unisvg")
-
-def on_response(resp):
-    req = resp.request
-    if req.resource_type not in ("xhr", "fetch"):
-        return
-    if any(h in req.url for h in AD):
-        return
-    e = {"method": req.method, "url": req.url, "status": resp.status, "post": (req.post_data or "")[:600]}
-    try:
-        if "json" in resp.headers.get("content-type", ""):
-            e["body"] = resp.text()[:1200]
-    except Exception:
-        pass
-    captured.append(e)
-
+# 1. Recuperer les cookies Queue-it via Playwright (une seule fois)
+print("=== 1. Obtention cookies via Playwright ===")
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    ctx = browser.new_context(user_agent=UA, locale="fr-FR", viewport={"width": 1440, "height": 900})
+    ctx = browser.new_context(user_agent=UA, locale="fr-FR")
     page = ctx.new_page()
-    page.on("response", on_response)
-    # Passer par la home de recherche pour recuperer les cookies queue-it
     page.goto(f"{TENUP_BASE}/recherche/tournois", wait_until="domcontentloaded", timeout=60000)
     try:
         page.wait_for_load_state("networkidle", timeout=30000)
     except Exception:
         pass
-    try:
-        page.get_by_role("button", name=re.compile("tout refuser", re.I)).first.click(timeout=4000)
-        time.sleep(1)
-    except Exception:
-        pass
-
-    print("=== NAVIGATION DIRECTE VERS LA PAGE RESULTATS ===")
-    page.goto(RESULTS, wait_until="domcontentloaded", timeout=60000)
-    try:
-        page.wait_for_load_state("networkidle", timeout=30000)
-    except Exception:
-        pass
-    time.sleep(8)
-    print("URL :", page.url)
-    body = page.evaluate("() => (document.body.innerText||'').replace(/\\s+/g,' ')")
-    print("Body[:400] :", body[:400])
-    print("codes niveaux visibles :", sorted(set(re.findall(r'P\d{2,4}\b', body)))[:15])
     cookies = {c["name"]: c["value"] for c in ctx.cookies()}
     browser.close()
+print("cookies obtenus :", sorted(cookies.keys()))
 
-print(f"\n=== XHR/FETCH CAPTURES ({len(captured)}) ===")
-for e in captured:
-    print(f"\n{e['method']} {e['url'][:220]}  -> {e['status']}")
-    if e.get("post"):
-        print("  POST :", e["post"])
-    if e.get("body"):
-        print("  JSON :", e["body"].replace(chr(10), " ")[:1000])
-
-print("\n=== SONDAGE DIRECT DES ENDPOINTS CANDIDATS ===")
 s = requests.Session()
-s.headers.update({"User-Agent": UA, "Accept": "application/json, text/plain, */*", "Referer": RESULTS})
+s.headers.update({
+    "User-Agent": UA,
+    "Accept": "application/json, text/plain, */*",
+    "Content-Type": "application/json",
+    "Origin": TENUP_BASE,
+    "Referer": f"{TENUP_BASE}/recherche/tournois/resultats",
+})
 for k, v in cookies.items():
     s.cookies.set(k, v)
-candidates = [
-    ("GET", "/back/public/v1/tournois/formulaire?environment=web_prod"),
-    ("GET", "/back/public/v1/tournois/resultats?environment=web_prod"),
-    ("GET", "/back/public/v1/recherche/tournois/resultats?environment=web_prod"),
-    ("GET", "/back/public/recherche/tournois/resultats?environment=web_prod"),
-    ("POST", "/back/public/v1/tournois/resultats?environment=web_prod"),
-    ("POST", "/back/public/v1/recherche/tournois/resultats?environment=web_prod"),
-]
-for method, path in candidates:
-    url = TENUP_BASE + path
-    try:
-        if method == "GET":
-            r = s.get(url, timeout=25, allow_redirects=False)
-        else:
-            r = s.post(url, json={"pratique": "PADEL", "page": 0}, timeout=25, allow_redirects=False)
-        ct = r.headers.get("content-type", "")[:40]
-        print(f"\n{method} {path}\n  -> {r.status_code} | {ct}")
-        if "json" in ct:
-            print("  JSON :", r.text[:500].replace(chr(10), " "))
-        elif r.status_code in (301, 302):
-            print("  location :", r.headers.get("location", "-")[:120])
-        else:
-            print("  body[:120] :", r.text[:120].replace(chr(10), " "))
-    except Exception as e:
-        print(f"\n{method} {path} -> EXCEPTION {str(e)[:100]}")
 
-print("\nDIAGNOSTIC PHASE 7 TERMINE")
+def q(payload, label):
+    print(f"\n=== {label} ===")
+    try:
+        r = s.post(API, data=json.dumps(payload), timeout=60)
+        print("HTTP:", r.status_code, "| taille:", len(r.text))
+        if r.status_code != 200:
+            print("body:", r.text[:300])
+            return None
+        d = r.json()
+        print("nbResultats:", d.get("nbResultats"), "| cards:", len(d.get("cards", [])))
+        return d
+    except Exception as e:
+        print("EXCEPTION:", str(e)[:200])
+        return None
+
+# 2. PADEL national, gros size
+base = {
+    "pratique": "PADEL", "from": 0, "size": 500, "lat": None, "lng": None,
+    "distance": 30, "type": [], "codeClub": None, "ligues": [], "comites": [],
+    "dateDebut": "2026-07-09T00:00:00.000Z", "dateFin": "2026-10-09T00:00:00.000Z",
+    "utiliserMesDonnees": False, "naturesEpreuves": [], "typesEpreuves": [],
+    "naturesTerrains": [], "categoriesJeu": [], "categoriesAge": [], "familles": [],
+    "tournoiInterne": False, "classements": [], "inscriptionEnLigne": None,
+    "paiementEnLigne": None, "filtres": True, "sort": "DISTANCE",
+}
+d = q(base, "PADEL national size=500 (sans lat/lng)")
+if d and d.get("cards"):
+    print("\n--- PREMIERE CARD PADEL (champs complets) ---")
+    print(json.dumps(d["cards"][0], ensure_ascii=False, indent=1)[:1500])
+    print("\n--- CLES PRESENTES ---")
+    print(sorted(d["cards"][0].keys()))
+    # combien de cards vraiment retournees vs size demande
+    print("\ncards retournees:", len(d["cards"]), "/ size demande 500 / total", d.get("nbResultats"))
+
+# 3. Test size tres grand (tout d'un coup ?)
+d2 = q({**base, "size": 10000}, "PADEL national size=10000 (tout en une requete ?)")
+if d2:
+    print("cards retournees avec size=10000 :", len(d2.get("cards", [])))
+
+# 4. Test pagination from
+d3 = q({**base, "from": 500, "size": 500}, "PADEL from=500 (page 2)")
+if d3 and d3.get("cards"):
+    print("premiere card page 2 idHomologation:", d3["cards"][0].get("idHomologation"))
+
+# 5. Filtre par ligue (ex IdF = 57) pour voir si sous-total coherent
+d4 = q({**base, "ligues": ["57"], "size": 10}, "PADEL ligue Ile-de-France (57)")
+
+# 6. Sondage : l'API repond-elle SANS cookies queue-it du tout ?
+print("\n=== 6. API SANS cookies (nouvelle session vierge) ===")
+s2 = requests.Session()
+s2.headers.update(s.headers)
+try:
+    r = s2.post(API, data=json.dumps(base), timeout=60, allow_redirects=False)
+    print("HTTP:", r.status_code, "| ct:", r.headers.get("content-type", "")[:40])
+    if r.status_code == 200:
+        print(">>> nbResultats:", r.json().get("nbResultats"), " => COOKIES QUEUE-IT NON REQUIS !")
+    else:
+        print("location:", r.headers.get("location", "-")[:100], "| body:", r.text[:150])
+except Exception as e:
+    print("EXCEPTION:", str(e)[:150])
+
+print("\nDIAGNOSTIC PHASE 8 TERMINE")
