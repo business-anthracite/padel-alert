@@ -68,12 +68,93 @@ LIGUES = [
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
-# Niveau P## : espace OU tiret optionnels ("P 250", "p-500"), colle au suffixe de
-# genre autorise ("P50H", "P100MIXTE") via (?!\d) au lieu de \b (sinon "P50H" echoue
-# car "0" et "H" sont tous deux word-chars = pas de frontiere). (?!\d) evite aussi que
-# "P1000" soit lu "P100". Le prefixe "P" est requis : on ne devine jamais un nombre nu
-# (risque de faux niveau sur une date/annee/compteur).
-NIVEAU_RE = re.compile(r'P[\s\-]*(25|50|100|250|500|1000|1500|2000)(?!\d)', re.IGNORECASE)
+# Niveaux valides FFT
+NIVEAUX = ("25", "50", "100", "250", "500", "1000", "1500", "2000")
+
+# 1) Niveau avec prefixe P : espace/tiret optionnels ("P 250", "p-500", "P  25"),
+#    colle au suffixe de genre ("P50H", "P100MIXTE") via (?!\d) au lieu de \b (sinon
+#    "P50H" echoue : "0" et "H" tous deux word-chars = pas de frontiere). (?!\d) evite
+#    aussi que "P1000" soit lu "P100".
+NIVEAU_P_RE = re.compile(r'P[\s\-]*(25|50|100|250|500|1000|1500|2000)(?!\d)', re.IGNORECASE)
+
+# 2) Fallback : niveau ecrit SANS prefixe P ("ALL IN 100H", "25 H et F", "PADEL 100
+#    Hommes"). Uniquement si aucun P## trouve. Le nombre doit correspondre EXACTEMENT a
+#    un niveau valide (borne par des non-chiffres) pour limiter les faux positifs.
+NIVEAU_BARE_RE = re.compile(r'(?<!\d)(25|50|100|250|500|1000|1500|2000)(?!\d)')
+
+
+# -- Resolution des coordonnees ---------------------------------------------------
+# La nouvelle API ne renvoie PAS les coords des clubs (sauf clubs "ligue" DROM/COM).
+# Resolution en 3 couches :
+#   1) coords presentes dans la card (rare)
+#   2) table club -> coords batie depuis l'ancien scraper (backend/clubs_coords.json,
+#      748 clubs, coords PRECISES du site) -> ~99% de couverture (clubs recurrents)
+#   3) geocodage de la ville via geo.api.gouv.fr (meme API que l'autocomplete du site)
+
+GEO_API = "https://geo.api.gouv.fr/communes"
+
+_CLUBS_COORDS = None
+_GEO_CACHE = {}
+
+
+def load_clubs_coords():
+    global _CLUBS_COORDS
+    if _CLUBS_COORDS is None:
+        path = os.path.join(os.path.dirname(__file__), "clubs_coords.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _CLUBS_COORDS = json.load(f)
+        except Exception:
+            _CLUBS_COORDS = {}
+        print(f"clubs_coords.json : {len(_CLUBS_COORDS)} clubs charges")
+    return _CLUBS_COORDS
+
+
+def norm_ville(v):
+    v = (v or "").strip()
+    v = re.sub(r'\s+CEDEX.*$', '', v, flags=re.IGNORECASE)   # "NOUMEA CEDEX" -> "NOUMEA"
+    v = re.sub(r'\s+\d+\s*$', '', v)                         # "PARIS 16" -> "PARIS"
+    return v.strip()
+
+
+def geocode_ville(session, ville):
+    """geo.api.gouv.fr : nom de ville -> (lat, lng, cp). Cache en memoire."""
+    key = (ville or "").strip().upper()
+    if not key:
+        return (None, None, "")
+    if key in _GEO_CACHE:
+        return _GEO_CACHE[key]
+    result = (None, None, "")
+    try:
+        r = session.get(GEO_API, params={
+            "nom": ville, "fields": "centre,codesPostaux",
+            "boost": "population", "limit": 1,
+        }, timeout=15)
+        arr = r.json()
+        if arr and arr[0].get("centre", {}).get("coordinates"):
+            lon, lat = arr[0]["centre"]["coordinates"]
+            cps = arr[0].get("codesPostaux") or []
+            result = (float(lat), float(lon), cps[0] if cps else "")
+    except Exception:
+        pass
+    _GEO_CACHE[key] = result
+    return result
+
+
+def resolve_coords(session, card):
+    """Retourne (lat, lng, cp) pour une card, via les 3 couches."""
+    club = card.get("club") or {}
+    # Couche 1 : coords dans la card
+    lat, lng = club.get("lat"), club.get("lng")
+    if lat and lng:
+        return (float(lat), float(lng), "")
+    # Couche 2 : table club -> coords
+    nom = (club.get("libelle") or "").strip().upper()
+    ref = load_clubs_coords().get(nom)
+    if ref and ref.get("lat") and ref.get("lng"):
+        return (float(ref["lat"]), float(ref["lng"]), ref.get("cp", "") or "")
+    # Couche 3 : geocodage de la ville
+    return geocode_ville(session, norm_ville(card.get("ville")))
 
 
 def make_session():
@@ -120,7 +201,15 @@ def fetch_ligue(session, ligue_id, date_debut_iso, date_fin_iso):
 # -- Parsing / mapping vers le format tournaments.json (identique v15) -------------
 
 def parse_niveaux(libelle):
-    return sorted({"P" + m for m in NIVEAU_RE.findall(libelle or "")})
+    lib = libelle or ""
+    # Coquille "P1OO" / "P5OO" : lettre O au lieu du zero. Normaliser O->0 pour la
+    # detection (sans risque : "HOMME"->"H0MME" ne cree aucun niveau valide).
+    lib_norm = lib.replace("O", "0").replace("o", "0")
+    codes = {"P" + m for m in NIVEAU_P_RE.findall(lib_norm)}
+    if not codes:
+        # Aucun "P##" : tenter le niveau sans prefixe ("ALL IN 100H", "25 H et F"...).
+        codes = {"P" + m for m in NIVEAU_BARE_RE.findall(lib_norm)}
+    return sorted(codes)
 
 
 def parse_competition(libelle):
@@ -163,7 +252,7 @@ def build_date_str(date_debut, date_fin):
         return date_debut[:10]
 
 
-def parse_card(card, ligue_name):
+def parse_card(session, card, ligue_name):
     idh = card.get("idHomologation", "")
     tid = numeric_id(idh)
     if not tid:
@@ -173,13 +262,7 @@ def parse_card(card, ligue_name):
     ville = card.get("ville", "") or ""
     lib   = card.get("libelleTournoi", "Tournoi") or "Tournoi"
 
-    lat = club.get("lat")
-    lng = club.get("lng")
-    try:
-        lat_f = float(lat) if lat not in (None, "", 0, 0.0, "0") else None
-        lng_f = float(lng) if lng not in (None, "", 0, 0.0, "0") else None
-    except (ValueError, TypeError):
-        lat_f = lng_f = None
+    lat_f, lng_f, cp = resolve_coords(session, card)
 
     date_debut = card.get("dateDebut")
     date_fin   = card.get("dateFin")
@@ -191,8 +274,8 @@ def parse_card(card, ligue_name):
         "libelle":           lib,
         "club":              club.get("libelle", "") or "",
         "ville":             ville,
-        "cp":                "",                       # absent de la nouvelle API (lat/lng fournis)
-        "adresse":           ville,
+        "cp":                cp or "",
+        "adresse":           (f"{cp} {ville}".strip() if cp else ville),
         "lat":               lat_f,
         "lng":               lng_f,
         "date_debut":        date_debut[:10] if date_debut else None,
@@ -224,7 +307,7 @@ def main():
         cards, nb = fetch_ligue(session, ligue["id"], date_debut_iso, date_fin_iso)
         added = 0
         for c in cards:
-            t = parse_card(c, ligue["name"])
+            t = parse_card(session, c, ligue["name"])
             if not t:
                 continue
             if t["tenup_id"] not in by_id:
@@ -253,6 +336,7 @@ def main():
     print(f"  avec niveau P## : {with_niveau} ({100*with_niveau//max(len(tournaments),1)}%)")
     print(f"  avec lat/lng    : {with_coords} ({100*with_coords//max(len(tournaments),1)}%)")
     print(f"  avec date_debut : {with_dates} ({100*with_dates//max(len(tournaments),1)}%)")
+    print(f"  geocodages ville (couche 3) : {len(_GEO_CACHE)}")
 
     errors = []
     if len(tournaments) < MIN_EXPECTED:
