@@ -22,7 +22,7 @@ s.headers.update({"User-Agent": UA, "Accept": "application/json, text/plain, */*
                   "Content-Type": "application/json", "Origin": TENUP_BASE,
                   "Referer": f"{TENUP_BASE}/recherche/tournois/resultats"})
 
-NIV = re.compile(r'P\s?(25|50|100|250|500|1000|1500|2000)\b', re.IGNORECASE)
+NIV = re.compile(r'P[\s\-]?(25|50|100|250|500|1000|1500|2000)(?!\d)', re.IGNORECASE)
 
 base = {"pratique":"PADEL","from":0,"size":5000,"lat":None,"lng":None,"distance":30,
 "type":[],"codeClub":None,"ligues":[],"comites":[],"dateDebut":"2026-07-09T00:00:00.000Z",
