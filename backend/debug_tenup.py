@@ -1,60 +1,22 @@
-"""Diagnostic Ten'Up phase 8 (09/07/2026) - TEMPORAIRE. Validation API v16.
-1. Cookies via Playwright (passage Queue-it) - minimal
-2. Test API PADEL sans navigateur : gros size, champs niveaux, volume national
+"""Diagnostic Ten'Up phase 9 (09/07/2026) - TEMPORAIRE. Endpoint DETAIL + niveau/age.
+Objectif : trouver ou lire niveau (P25...), categorie age, type competition, lien.
+API liste sans cookies (confirme phase 8).
 """
 import json
-import time
+import re
 import requests
-from playwright.sync_api import sync_playwright
 
 TENUP_BASE = "https://tenup.fft.fr"
-API = f"{TENUP_BASE}/back/public/v1/tournois"
+API_LIST = f"{TENUP_BASE}/back/public/v1/tournois"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
-# 1. Recuperer les cookies Queue-it via Playwright (une seule fois)
-print("=== 1. Obtention cookies via Playwright ===")
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
-    ctx = browser.new_context(user_agent=UA, locale="fr-FR")
-    page = ctx.new_page()
-    page.goto(f"{TENUP_BASE}/recherche/tournois", wait_until="domcontentloaded", timeout=60000)
-    try:
-        page.wait_for_load_state("networkidle", timeout=30000)
-    except Exception:
-        pass
-    cookies = {c["name"]: c["value"] for c in ctx.cookies()}
-    browser.close()
-print("cookies obtenus :", sorted(cookies.keys()))
-
 s = requests.Session()
-s.headers.update({
-    "User-Agent": UA,
-    "Accept": "application/json, text/plain, */*",
-    "Content-Type": "application/json",
-    "Origin": TENUP_BASE,
-    "Referer": f"{TENUP_BASE}/recherche/tournois/resultats",
-})
-for k, v in cookies.items():
-    s.cookies.set(k, v)
+s.headers.update({"User-Agent": UA, "Accept": "application/json, text/plain, */*",
+                  "Content-Type": "application/json", "Origin": TENUP_BASE,
+                  "Referer": f"{TENUP_BASE}/recherche/tournois/resultats"})
 
-def q(payload, label):
-    print(f"\n=== {label} ===")
-    try:
-        r = s.post(API, data=json.dumps(payload), timeout=60)
-        print("HTTP:", r.status_code, "| taille:", len(r.text))
-        if r.status_code != 200:
-            print("body:", r.text[:300])
-            return None
-        d = r.json()
-        print("nbResultats:", d.get("nbResultats"), "| cards:", len(d.get("cards", [])))
-        return d
-    except Exception as e:
-        print("EXCEPTION:", str(e)[:200])
-        return None
-
-# 2. PADEL national, gros size
 base = {
-    "pratique": "PADEL", "from": 0, "size": 500, "lat": None, "lng": None,
+    "pratique": "PADEL", "from": 0, "size": 30, "lat": None, "lng": None,
     "distance": 30, "type": [], "codeClub": None, "ligues": [], "comites": [],
     "dateDebut": "2026-07-09T00:00:00.000Z", "dateFin": "2026-10-09T00:00:00.000Z",
     "utiliserMesDonnees": False, "naturesEpreuves": [], "typesEpreuves": [],
@@ -62,40 +24,66 @@ base = {
     "tournoiInterne": False, "classements": [], "inscriptionEnLigne": None,
     "paiementEnLigne": None, "filtres": True, "sort": "DISTANCE",
 }
-d = q(base, "PADEL national size=500 (sans lat/lng)")
-if d and d.get("cards"):
-    print("\n--- PREMIERE CARD PADEL (champs complets) ---")
-    print(json.dumps(d["cards"][0], ensure_ascii=False, indent=1)[:1500])
-    print("\n--- CLES PRESENTES ---")
-    print(sorted(d["cards"][0].keys()))
-    # combien de cards vraiment retournees vs size demande
-    print("\ncards retournees:", len(d["cards"]), "/ size demande 500 / total", d.get("nbResultats"))
+print("=== 1. Echantillon 30 tournois PADEL ===")
+d = s.post(API_LIST, data=json.dumps(base), timeout=60).json()
+cards = d.get("cards", [])
+print("recus:", len(cards))
 
-# 3. Test size tres grand (tout d'un coup ?)
-d2 = q({**base, "size": 10000}, "PADEL national size=10000 (tout en une requete ?)")
-if d2:
-    print("cards retournees avec size=10000 :", len(d2.get("cards", [])))
+print("\n=== 2. Analyse libelleTournoi (niveau P## extractible ?) ===")
+niveau_re = re.compile(r'\bP(?:25|50|100|250|500|1000|1500|2000)\b')
+found = 0
+for c in cards[:30]:
+    lib = c.get("libelleTournoi", "")
+    m = niveau_re.findall(lib)
+    if m:
+        found += 1
+    print(f"  [{','.join(m) if m else '--'}] {lib[:70]}")
+print(f"\n-> {found}/{len(cards[:30])} libelles contiennent un niveau P##")
 
-# 4. Test pagination from
-d3 = q({**base, "from": 500, "size": 500}, "PADEL from=500 (page 2)")
-if d3 and d3.get("cards"):
-    print("premiere card page 2 idHomologation:", d3["cards"][0].get("idHomologation"))
+# Recuperer un id numerique : idHomologation = "FED_82559985" -> extraire 82559985
+def numeric_id(idh):
+    m = re.search(r'(\d{5,})', idh or "")
+    return m.group(1) if m else None
 
-# 5. Filtre par ligue (ex IdF = 57) pour voir si sous-total coherent
-d4 = q({**base, "ligues": ["57"], "size": 10}, "PADEL ligue Ile-de-France (57)")
+sample = cards[0]
+idh = sample.get("idHomologation")
+nid = numeric_id(idh)
+print(f"\n=== 3. Sondage endpoints DETAIL (idHomologation={idh}, num={nid}) ===")
+candidates = [
+    f"/back/public/v1/tournois/{nid}",
+    f"/back/public/v1/tournois/{idh}",
+    f"/back/public/v1/tournois/resultats?idTournoi={nid}",
+    f"/back/public/v1/tournois/detail/{nid}",
+    f"/back/public/v1/tournois/{nid}/detail",
+    f"/back/public/v1/tournois/{nid}/epreuves",
+    f"/back/public/v1/tournoi/{nid}",
+]
+for path in candidates:
+    url = TENUP_BASE + path
+    try:
+        r = s.get(url, timeout=25, allow_redirects=False)
+        ct = r.headers.get("content-type", "")[:30]
+        print(f"\nGET {path}\n  -> {r.status_code} | {ct}")
+        if r.status_code == 200 and "json" in ct:
+            body = r.text
+            print("  taille:", len(body))
+            # chercher niveau / age / cp dans la reponse
+            print("  contient 'P25'/'P100':", bool(re.search(r'P(25|50|100|250|500)', body)))
+            print("  contient 'niveau':", "niveau" in body.lower(), "| 'categorie':", "categorie" in body.lower(), "| 'age':", "age" in body.lower())
+            print("  contient CP/codePostal:", "codePostal" in body.lower() or "codepostal" in body.lower())
+            print("  JSON[:900]:", body[:900].replace(chr(10), " "))
+        elif "json" in ct:
+            print("  body:", r.text[:200].replace(chr(10), " "))
+    except Exception as e:
+        print(f"\nGET {path} -> EXCEPTION {str(e)[:80]}")
 
-# 6. Sondage : l'API repond-elle SANS cookies queue-it du tout ?
-print("\n=== 6. API SANS cookies (nouvelle session vierge) ===")
-s2 = requests.Session()
-s2.headers.update(s.headers)
-try:
-    r = s2.post(API, data=json.dumps(base), timeout=60, allow_redirects=False)
-    print("HTTP:", r.status_code, "| ct:", r.headers.get("content-type", "")[:40])
-    if r.status_code == 200:
-        print(">>> nbResultats:", r.json().get("nbResultats"), " => COOKIES QUEUE-IT NON REQUIS !")
-    else:
-        print("location:", r.headers.get("location", "-")[:100], "| body:", r.text[:150])
-except Exception as e:
-    print("EXCEPTION:", str(e)[:150])
+print("\n=== 4. Ancienne fiche tournoi (page HTML detail) ? ===")
+# L'app Nuxt a peut-etre une page /tournoi/{id} qui charge un endpoint detail
+for path in [f"/tournoi/{nid}", f"/recherche/tournois/{nid}", f"/tournoi/confirmation?id={nid}"]:
+    try:
+        r = s.get(TENUP_BASE + path, timeout=25, allow_redirects=False)
+        print(f"GET {path} -> {r.status_code} | {r.headers.get('content-type','')[:30]} | loc={r.headers.get('location','-')[:80]}")
+    except Exception as e:
+        print(f"GET {path} -> EXC {str(e)[:60]}")
 
-print("\nDIAGNOSTIC PHASE 8 TERMINE")
+print("\nDIAGNOSTIC PHASE 9 TERMINE")
