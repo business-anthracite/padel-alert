@@ -1,0 +1,20 @@
+name: Debug TenUp (temporaire)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer les dependances
+        run: |
+          pip install requests playwright
+          playwright install chromium
+      - name: Diagnostic TenUp
+        run: python backend/debug_tenup.py
