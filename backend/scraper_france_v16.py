@@ -22,7 +22,10 @@ CHAMPS MANQUANTS DANS L'API (vs ancienne) - deduits du libelleTournoi :
   - niveau_codes (P25/P50/.../P2000) : extraits du libelle (regex, casse/espace tolerants)
   - competition_codes (P/CE/CEQ) : "championnat"+"equipe"->CEQ, "championnat"->CE, sinon P
   - age_codes : "+45"->345, "+55"->355, sinon Senior 200 (padel quasi 100% Senior)
-  - cp : absent, remplace par lat/lng direct (club.lat/lng), toujours presents
+  - cp/adresse/lat/lng : absents de la reponse de recherche (POST /tournois) sauf
+    rarement club.lat/lng -> resolus via l'endpoint detail GET /tournois/{id}/
+    fiche-tournoi (adresse exacte, voir section "Resolution des coordonnees" plus bas,
+    ajoute le 31/08/2026 suite a un bug de collision de nom decouvert en prod)
 
 CONTINUITE tenup_id : idHomologation = "FED_82559985" / "MOJA_243827" -> partie numerique.
 A valider : recouvrement avec les tenup_id de l'ancien tournaments.json (sinon
@@ -84,17 +87,34 @@ NIVEAU_BARE_RE = re.compile(r'(?<!\d)(25|50|100|250|500|1000|1500|2000)(?!\d)')
 
 
 # -- Resolution des coordonnees ---------------------------------------------------
-# La nouvelle API ne renvoie PAS les coords des clubs (sauf clubs "ligue" DROM/COM).
-# Resolution en 3 couches :
-#   1) coords presentes dans la card (rare)
-#   2) table club -> coords batie depuis l'ancien scraper (backend/clubs_coords.json,
-#      748 clubs, coords PRECISES du site) -> ~99% de couverture (clubs recurrents)
-#   3) geocodage de la ville via geo.api.gouv.fr (meme API que l'autocomplete du site)
+# La nouvelle API de recherche (POST /tournois) ne renvoie PAS d'adresse precise par
+# tournoi (juste ville, rarement club.lat/lng). Decouvert le 31/08/2026 (investigation
+# suite a un signalement Baptiste : "PADEL SHOT" a Trappes remontait le CP de
+# Clermont-Ferrand) : un second endpoint GET /tournois/{idHomologation}/fiche-tournoi
+# (meme prefixe /back/public/v1, sans cookie/Queue-it, deja valide en conditions
+# reelles) renvoie l'adresse postale EXACTE du club (adresse1/adresse2, codePostal,
+# ville, latitude/longitude) ainsi qu'un identifiant club unique (club.code) - fiable
+# meme quand deux clubs physiquement differents partagent le meme nom brut (ex :
+# "PADEL SHOT" existe a Trappes ET a Chantepie ET a Lille, avec des club.code
+# differents : la table couche 2 ci-dessous, indexee par NOM SEUL, les confondait
+# tous sous une unique coordonnee - 54 clubs et 388 tournois concernes au 31/08/2026,
+# voir tools/backups/2026-08-31-tenup-adresse-precise/).
+#
+# Resolution en 4 couches, appelee une fois par tournoi (mise en cache par club) :
+#   1) coords presentes dans la card (rare, gratuit - inchangee)
+#   2) fiche-tournoi (adresse exacte, mise en cache par (nom club, ville) pour ne
+#      faire qu'UN appel reseau par club reellement distinct, pas par tournoi -
+#      environ 760-900 clubs uniques sur ~8250 tournois)
+#   3) table club -> coords (backend/clubs_coords.json, 748 clubs) - filet de securite
+#      si l'appel fiche-tournoi echoue (reseau, timeout, tournoi retire entre-temps)
+#   4) geocodage de la ville via geo.api.gouv.fr - dernier recours
 
 GEO_API = "https://geo.api.gouv.fr/communes"
+FICHE_TOURNOI_API = f"{TENUP_BASE}/back/public/v1/tournois"
 
 _CLUBS_COORDS = None
 _GEO_CACHE = {}
+_FICHE_CACHE = {}
 
 
 def load_clubs_coords():
@@ -141,20 +161,57 @@ def geocode_ville(session, ville):
     return result
 
 
+def fetch_fiche_tournoi(session, id_homologation):
+    """GET /tournois/{idHomologation}/fiche-tournoi : adresse exacte du club.
+    Retourne (lat, lng, cp, adresse, club_code) ou None si indisponible."""
+    if not id_homologation:
+        return None
+    try:
+        r = session.get(f"{FICHE_TOURNOI_API}/{id_homologation}/fiche-tournoi", timeout=10)
+        if r.status_code != 200:
+            return None
+        t = (r.json() or {}).get("tournoi") or {}
+        cp = (t.get("codePostal") or "").strip()
+        lat, lng = t.get("latitude"), t.get("longitude")
+        if not (cp and lat and lng):
+            return None
+        adr = " ".join(p for p in [t.get("adresse1"), t.get("adresse2")] if p) or None
+        club_code = ((t.get("club") or {}).get("code") or "").strip() or None
+        return (float(lat), float(lng), cp, adr, club_code)
+    except Exception:
+        return None
+
+
 def resolve_coords(session, card):
-    """Retourne (lat, lng, cp) pour une card, via les 3 couches."""
+    """Retourne (lat, lng, cp, adresse_precise) pour une card, via les 4 couches.
+    fiche-tournoi (couche 2) est tentee EN PREMIER malgre son cout reseau : c'est la
+    seule couche qui fournit le CP, et card.lat/lng (couche 1) n'en fournit jamais
+    (le CP resterait vide pour ces cas si on s'arretait la - bug trouve le 31/08/2026
+    sur TERRAPADEL/COMITE AIN TENNIS/PADEL+AGEN, 10 tournois sans CP malgre lat/lng
+    presents). Le cache par (nom club, ville) rend ce reordonnancement quasi gratuit :
+    un seul appel reseau par club physiquement distinct, quelle que soit la couche
+    qui finit par fournir les coordonnees utilisees."""
     club = card.get("club") or {}
-    # Couche 1 : coords dans la card
+    cache_key = ((club.get("libelle") or "").strip().upper(), norm_ville(card.get("ville")).upper())
+    if cache_key not in _FICHE_CACHE:
+        _FICHE_CACHE[cache_key] = fetch_fiche_tournoi(session, card.get("idHomologation"))
+    fiche = _FICHE_CACHE[cache_key]
+    if fiche:
+        lat_f, lng_f, cp_f, adr_f, _club_code = fiche
+        return (lat_f, lng_f, cp_f, adr_f)
+    # Couche 1 : coords dans la card (fiche-tournoi indisponible, mais Ten'Up fournit
+    # deja lat/lng directement) - jamais de CP dans ce cas.
     lat, lng = club.get("lat"), club.get("lng")
     if lat and lng:
-        return (float(lat), float(lng), "")
-    # Couche 2 : table club -> coords
+        return (float(lat), float(lng), "", None)
+    # Couche 3 : table club -> coords (filet de securite si fiche-tournoi indisponible)
     nom = (club.get("libelle") or "").strip().upper()
     ref = load_clubs_coords().get(nom)
     if ref and ref.get("lat") and ref.get("lng"):
-        return (float(ref["lat"]), float(ref["lng"]), ref.get("cp", "") or "")
-    # Couche 3 : geocodage de la ville
-    return geocode_ville(session, norm_ville(card.get("ville")))
+        return (float(ref["lat"]), float(ref["lng"]), ref.get("cp", "") or "", None)
+    # Couche 4 : geocodage de la ville
+    lat_g, lng_g, cp_g = geocode_ville(session, norm_ville(card.get("ville")))
+    return (lat_g, lng_g, cp_g, None)
 
 
 def make_session():
@@ -262,7 +319,7 @@ def parse_card(session, card, ligue_name):
     ville = card.get("ville", "") or ""
     lib   = card.get("libelleTournoi", "Tournoi") or "Tournoi"
 
-    lat_f, lng_f, cp = resolve_coords(session, card)
+    lat_f, lng_f, cp, adresse_precise = resolve_coords(session, card)
 
     date_debut = card.get("dateDebut")
     date_fin   = card.get("dateFin")
@@ -275,7 +332,7 @@ def parse_card(session, card, ligue_name):
         "club":              club.get("libelle", "") or "",
         "ville":             ville,
         "cp":                cp or "",
-        "adresse":           (f"{cp} {ville}".strip() if cp else ville),
+        "adresse":           (adresse_precise or (f"{cp} {ville}".strip() if cp else ville)),
         "lat":               lat_f,
         "lng":               lng_f,
         "date_debut":        date_debut[:10] if date_debut else None,
@@ -330,13 +387,17 @@ def main():
     #    manifestement casse (volume plancher + champs critiques presents). --------
     with_niveau = sum(1 for t in tournaments if t["niveau_codes"])
     with_coords = sum(1 for t in tournaments if t["lat"] and t["lng"])
+    with_cp     = sum(1 for t in tournaments if t["cp"])
     with_dates  = sum(1 for t in tournaments if t["date_debut"])
+    fiche_ok    = sum(1 for v in _FICHE_CACHE.values() if v)
     print(f"\n{'='*60}")
     print(f"Total padel France : {len(tournaments)} tournois uniques ({elapsed:.0f}s)")
     print(f"  avec niveau P## : {with_niveau} ({100*with_niveau//max(len(tournaments),1)}%)")
     print(f"  avec lat/lng    : {with_coords} ({100*with_coords//max(len(tournaments),1)}%)")
+    print(f"  avec code postal: {with_cp} ({100*with_cp//max(len(tournaments),1)}%)")
     print(f"  avec date_debut : {with_dates} ({100*with_dates//max(len(tournaments),1)}%)")
-    print(f"  geocodages ville (couche 3) : {len(_GEO_CACHE)}")
+    print(f"  fiche-tournoi (couche 2) : {fiche_ok}/{len(_FICHE_CACHE)} clubs resolus avec succes")
+    print(f"  geocodages ville (couche 4, dernier recours) : {len(_GEO_CACHE)}")
 
     errors = []
     if len(tournaments) < MIN_EXPECTED:
