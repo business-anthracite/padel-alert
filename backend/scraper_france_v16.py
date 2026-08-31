@@ -183,14 +183,15 @@ def fetch_fiche_tournoi(session, id_homologation):
 
 
 def resolve_coords(session, card):
-    """Retourne (lat, lng, cp, adresse_precise) pour une card, via les 4 couches."""
+    """Retourne (lat, lng, cp, adresse_precise) pour une card, via les 4 couches.
+    fiche-tournoi (couche 2) est tentee EN PREMIER malgre son cout reseau : c'est la
+    seule couche qui fournit le CP, et card.lat/lng (couche 1) n'en fournit jamais
+    (le CP resterait vide pour ces cas si on s'arretait la - bug trouve le 31/08/2026
+    sur TERRAPADEL/COMITE AIN TENNIS/PADEL+AGEN, 10 tournois sans CP malgre lat/lng
+    presents). Le cache par (nom club, ville) rend ce reordonnancement quasi gratuit :
+    un seul appel reseau par club physiquement distinct, quelle que soit la couche
+    qui finit par fournir les coordonnees utilisees."""
     club = card.get("club") or {}
-    # Couche 1 : coords dans la card
-    lat, lng = club.get("lat"), club.get("lng")
-    if lat and lng:
-        return (float(lat), float(lng), "", None)
-    # Couche 2 : fiche-tournoi (adresse exacte), mise en cache par (nom club, ville) -
-    # 1 seul appel reseau par club physiquement distinct, pas par tournoi.
     cache_key = ((club.get("libelle") or "").strip().upper(), norm_ville(card.get("ville")).upper())
     if cache_key not in _FICHE_CACHE:
         _FICHE_CACHE[cache_key] = fetch_fiche_tournoi(session, card.get("idHomologation"))
@@ -198,6 +199,11 @@ def resolve_coords(session, card):
     if fiche:
         lat_f, lng_f, cp_f, adr_f, _club_code = fiche
         return (lat_f, lng_f, cp_f, adr_f)
+    # Couche 1 : coords dans la card (fiche-tournoi indisponible, mais Ten'Up fournit
+    # deja lat/lng directement) - jamais de CP dans ce cas.
+    lat, lng = club.get("lat"), club.get("lng")
+    if lat and lng:
+        return (float(lat), float(lng), "", None)
     # Couche 3 : table club -> coords (filet de securite si fiche-tournoi indisponible)
     nom = (club.get("libelle") or "").strip().upper()
     ref = load_clubs_coords().get(nom)
